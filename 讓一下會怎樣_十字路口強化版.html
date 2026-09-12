@@ -1,0 +1,2408 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0d0f14">
+<title>讓一下會怎樣 · 十字路口強化版</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#0d0f14;
+ font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei","Heiti TC",sans-serif;
+ color:#f2ede4;-webkit-user-select:none;user-select:none;-webkit-text-size-adjust:100%}
+#app{position:relative;display:flex;flex-direction:column;height:100dvh;max-width:1100px;margin:0 auto;background:#0d0f14}
+#stage{position:relative;flex:1 1 auto;min-height:0;overflow:hidden}
+canvas{display:block;width:100%;height:100%}
+
+/* ---- 行車資訊列 ---- */
+#hud{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:7px;
+ padding:9px 11px;font-size:13px;pointer-events:none;z-index:3}
+.chip{background:rgba(11,13,19,.66);border:1px solid rgba(242,237,228,.16);border-radius:3px;
+ padding:5px 10px;letter-spacing:.02em;backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
+.chip b{font-weight:700}
+#hName{flex:1 1 auto;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.hbtn{pointer-events:auto;background:rgba(11,13,19,.66);border:1px solid rgba(242,237,228,.16);
+ color:#f2ede4;border-radius:3px;width:30px;height:30px;font-size:14px;font-family:inherit;cursor:pointer}
+
+/* ---- 操作區 ---- */
+#pad{flex:0 0 auto;display:flex;gap:9px;padding:10px;height:132px;background:#12151c;border-top:1px solid #232833}
+.ctl{flex:1 1 0;border:0;border-radius:6px;font-family:inherit;font-weight:800;color:#0d0f14;
+ display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;
+ font-size:23px;letter-spacing:.08em;transition:filter .08s,transform .08s}
+.ctl small{font-size:11px;font-weight:600;letter-spacing:.04em;opacity:.62}
+.ctl:active{filter:brightness(1.18);transform:translateY(2px)}
+#bBrake{background:#e0574a;color:#fff8f2;flex:1.15}
+#bHorn{background:#2a2f3a;color:#e8c24a;flex:.55;font-size:17px;border:1px solid #3a4150}
+#bGas{background:#57c98a;flex:1.15}
+.steerb{background:#4a86c9;color:#f2f7ff;flex:.9;font-size:21px}
+.steerb small{color:#dbe8fa}
+.ctl[hidden]{display:none}
+#pad.steer #bBrake{flex:1}
+#pad.steer #bGas{flex:1}
+#pad.steer #bHorn{flex:.5}
+
+/* ---- 全螢幕頁面 ---- */
+#screens{position:absolute;inset:0;display:none;z-index:9;background:#14171e;overflow-y:auto;-webkit-overflow-scrolling:touch}
+#screens.on{display:block}
+.sc{display:none;min-height:100%;padding:26px 22px 34px}
+.sc.on{display:block}
+.wrap{max-width:520px;margin:0 auto}
+
+/* 路面塗料標題 */
+.hero{padding:34px 0 26px;position:relative}
+.hero:before{content:"";position:absolute;left:0;right:0;top:0;height:100%;
+ background:repeating-linear-gradient(180deg,#e0b23f 0 26px,transparent 26px 56px);
+ width:5px;opacity:.55}
+.hero-in{padding-left:26px}
+.t1{font-size:clamp(46px,15vw,78px);line-height:.92;font-weight:900;color:#f4f0e4;letter-spacing:-.01em}
+.t1 span{display:block}
+.t2{margin-top:16px;font-size:15px;line-height:1.75;color:#9aa4b2;max-width:30em}
+.credit{margin-top:26px;font-size:12px;color:#5f6875}
+
+h2{font-size:24px;font-weight:800;margin-bottom:6px}
+.sub{font-size:14px;color:#9aa4b2;line-height:1.75;margin-bottom:22px}
+
+.act{display:block;width:100%;margin-top:11px;padding:15px 18px;border-radius:5px;
+ font-family:inherit;font-size:17px;font-weight:800;cursor:pointer;text-align:left;
+ background:#e0b23f;color:#15181f;border:0;letter-spacing:.02em}
+.act.ghost{background:transparent;color:#c3cbd6;border:1px solid #333b48}
+.act:active{filter:brightness(1.12)}
+
+/* 關卡 */
+#lvGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:9px;margin-bottom:20px}
+.lv{display:flex;flex-direction:column;gap:3px;padding:13px 13px 11px;border-radius:5px;
+ background:#1c202a;border:1px solid #2b3240;border-left:4px solid #e0b23f;
+ font-family:inherit;color:#f2ede4;text-align:left;cursor:pointer}
+.lv:active{background:#232935}
+.lv.locked{border-left-color:#39404f;color:#5f6875;cursor:default}
+.lvn{font-size:11px;font-weight:700;color:#8a94a3;letter-spacing:.1em}
+.lv.locked .lvn{color:#4a525f}
+.lvt{font-size:15px;font-weight:700}
+.lvs{font-size:13px;color:#e0b23f;letter-spacing:.14em}
+.lv.locked .lvs{color:#4a525f;letter-spacing:0;font-size:11px}
+
+/* 說明 */
+.rule{display:flex;gap:13px;padding:13px 0;border-bottom:1px solid #232a35}
+.rule:last-of-type{border-bottom:0}
+.rk{flex:0 0 62px;font-size:12px;font-weight:800;color:#0d0f14;background:#e0b23f;
+ border-radius:3px;height:24px;display:flex;align-items:center;justify-content:center}
+.rk.bad{background:#e0574a;color:#fff}
+.rk.ok{background:#57c98a}
+.rv{flex:1;font-size:14px;line-height:1.7;color:#cfd6e0}
+.rv em{font-style:normal;color:#f2ede4;font-weight:700}
+
+/* 結果 */
+.rs-head{font-size:13px;font-weight:800;letter-spacing:.28em;margin-bottom:10px}
+.rs-head.ok{color:#57c98a}
+.rs-head.bad{color:#e0574a}
+#rsTitle{font-size:clamp(30px,9vw,42px);font-weight:900;line-height:1.15}
+#rsDesc{margin-top:12px;font-size:14px;line-height:1.75;color:#9aa4b2}
+#rsStars{margin-top:20px;font-size:34px;color:#e0b23f;letter-spacing:.14em}
+#rsScore{margin-top:8px;font-size:15px;color:#cfd6e0;font-weight:700}
+.rs-acts{margin-top:28px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="hud">
+      <span class="chip" id="hName">—</span>
+      <span class="chip">剩 <b id="hDist">0 m</b></span>
+      <span class="chip"><b id="hTime">0s</b></span>
+      <button class="hbtn" id="btnSound" title="音效">♪</button>
+      <button class="hbtn" id="btnQuit" title="離開">✕</button>
+    </div>
+  </div>
+
+  <div id="pad">
+    <button class="ctl steerb" id="bLeft" hidden>◀<small>左轉</small></button>
+    <button class="ctl" id="bBrake">煞車<small>按住</small></button>
+    <button class="ctl" id="bHorn">叭<small>沒用</small></button>
+    <button class="ctl" id="bGas">油門<small>按住</small></button>
+    <button class="ctl steerb" id="bRight" hidden>▶<small>右轉</small></button>
+  </div>
+
+  <div id="screens">
+    <!-- 標題 -->
+    <section class="sc" id="sc-title"><div class="wrap">
+      <div class="hero"><div class="hero-in">
+        <h1 class="t1"><span>讓一下</span><span>會怎樣</span></h1>
+        <p class="t2">你坐在駕駛座上。前面有斑馬線，斑馬線上有人。<br>他走得很慢，他走到一半反悔，他在馬路中間打太極。<br>而你能做的，只有停下來等。</p>
+      </div></div>
+      <button class="act" id="btnStart">開始開車</button>
+      <button class="act ghost" id="btnHow">怎麼玩</button>
+      <p class="credit">全 24 關 · 27 種角色 · 新人登場 × 舊人混搭 · 小綠人倒數與闖紅燈行人</p>
+    </div></section>
+
+    <!-- 關卡 -->
+    <section class="sc" id="sc-levels"><div class="wrap">
+      <h2>選一段路</h2>
+      <p class="sub">每關第一個斑馬線認識新人，後面是舊角色混搭。越後面人潮越多！第 19 關起加入行人倒數號誌，第 20、23、24 關還有人闖紅燈。</p>
+      <div id="lvGrid"></div>
+      <button class="act ghost" id="btnLvBack">回標題</button>
+    </div></section>
+
+    <!-- 說明 -->
+    <section class="sc" id="sc-howto"><div class="wrap">
+      <h2>怎麼玩</h2>
+      <p class="sub">油門前進、煞車停下，最外側的 ◀ ▶ 控制方向盤。多數路是直的，方向盤讓你微調、閃位、過右轉彎道——但別開出車道。鍵盤：↑↓ 或空白鍵、← → 轉向、H 喇叭。</p>
+
+      <div class="rule"><span class="rk ok">要做</span><span class="rv">斑馬線上<em>只要有人</em>，就得在白色停止線前把車停住。等他完全走到對面才能走。</span></div>
+      <div class="rule"><span class="rk ok">要做</span><span class="rv">有紅綠燈的路口，紅燈亮著時<em>車頭不能越過停止線</em>。</span></div>
+      <div class="rule"><span class="rk ok">要做</span><span class="rv">在時間內開到「目的地」牌樓下面。</span></div>
+      <div class="rule"><span class="rk ok">路口</span><span class="rv">有些關卡是<em>十字路口</em>，要<em>左轉或右轉</em>。用鍵盤 <em>← →</em> 或畫面左右的方向鍵轉進去。<em>轉彎車要讓「你轉進去那條路」上的行人先過</em>——這是路口最常撞到人的地方，也是台灣新制加強取締的重點。</span></div>
+      <div class="rule"><span class="rk bad">會失敗</span><span class="rv"><em>沒禮讓行人</em>（直接撞到也算，還會把人撞飛）、<em>闖紅燈</em>、<em>時間到</em>。右轉關卡再加：壓上人行道、開到對向車道。</span></div>
+      <div class="rule"><span class="rk">會扣分</span><span class="rv">按喇叭。有人會加快腳步說「好啦好啦」，有人會<em>故意走得更慢</em>，也有人會直接走到你車頭前面<em>敲你的引擎蓋</em>罵一輪再回去。三種都扣分。</span></div>
+      <div class="rule"><span class="rk ok">小綠人</span><span class="rv">第 19 關起有行人號誌與讀秒；最後 5 秒小綠人加快閃爍。有些人會闖行人紅燈，<em>車輛綠燈也必須停讓</em>。</span></div>
+      <div class="rule"><span class="rk">會發生</span><span class="rv">撞到人不會直接跳結算，你會看著他飛出去。看清楚一點。</span></div>
+      <div class="rule"><span class="rk">別理它</span><span class="rv">後照鏡裡那台車會越貼越近、閃大燈、按喇叭。它不扣你的分，它只是想讓你緊張。</span></div>
+
+      <p class="sub" style="margin-top:22px">現實中的《道路交通管理處罰條例》第 44 條第 2 項：汽車行近行人穿越道，遇有行人穿越時未暫停讓行人先行通過，罰鍰新臺幣 1200 至 6000 元。這遊戲比法條嚴格一點，但也沒有嚴格太多。</p>
+      <button class="act ghost" id="btnHowBack">知道了</button>
+    </div></section>
+
+    <!-- 結果 -->
+    <section class="sc" id="sc-result"><div class="wrap">
+      <div style="padding-top:22px">
+        <p class="rs-head bad" id="rsHead">失敗</p>
+        <h2 id="rsTitle">—</h2>
+        <p id="rsDesc">—</p>
+        <p id="rsStars"></p>
+        <p id="rsScore"></p>
+        <div class="rs-acts">
+          <button class="act" id="btnNext">下一關</button>
+          <button class="act" id="btnRetry">再開一次</button>
+          <button class="act ghost" id="btnMenu">選其他關</button>
+        </div>
+      </div>
+    </div></section>
+  </div>
+</div>
+<script>
+/* 讓一下會怎樣 — 禮讓行人駕駛遊戲 (vanilla JS) */
+(function(){
+'use strict';
+
+/* ============ 0. 小工具 ============ */
+var clamp=function(v,a,b){return v<a?a:(v>b?b:v);};
+var lerp=function(a,b,t){return a+(b-a)*t;};
+var rnd=function(a,b){return a+Math.random()*(b-a);};
+function mulberry(seed){var t=seed>>>0;return function(){t+=0x6D2B79F5;var r=t;r=Math.imul(r^r>>>15,r|1);r^=r+Math.imul(r^r>>>7,r|61);return((r^r>>>14)>>>0)/4294967296;};}
+
+/* ---- 色彩系統：先建系統再畫圖 ---- */
+function hex2rgb(h){h=h.replace('#','');if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];var n=parseInt(h,16);return[(n>>16)&255,(n>>8)&255,n&255];}
+function rgb2hsl(c){var r=c[0]/255,g=c[1]/255,b=c[2]/255;var mx=Math.max(r,g,b),mn=Math.min(r,g,b);var h=0,s=0,l=(mx+mn)/2;var d=mx-mn;
+ if(d>0){s=l>0.5?d/(2-mx-mn):d/(mx+mn);
+  if(mx===r)h=((g-b)/d+(g<b?6:0));else if(mx===g)h=(b-r)/d+2;else h=(r-g)/d+4;h*=60;}
+ return[h,s,l];}
+function hsl2hex(h,s,l){h=((h%360)+360)%360;var c=(1-Math.abs(2*l-1))*s,x=c*(1-Math.abs((h/60)%2-1)),m=l-c/2,r,g,b;
+ if(h<60){r=c;g=x;b=0;}else if(h<120){r=x;g=c;b=0;}else if(h<180){r=0;g=c;b=x;}
+ else if(h<240){r=0;g=x;b=c;}else if(h<300){r=x;g=0;b=c;}else{r=c;g=0;b=x;}
+ var f=function(v){var n=Math.round((v+m)*255);n=n<0?0:(n>255?255:n);return(n<16?'0':'')+n.toString(16);};
+ return '#'+f(r)+f(g)+f(b);}
+var _shadeCache={};
+// t<0 -> 陰影（偏冷、降明度）；t>0 -> 受光（偏暖、升明度）。陰影不只加深，也轉色相。
+function shade(hex,t){
+ var k=hex+'|'+t.toFixed(2);if(_shadeCache[k])return _shadeCache[k];
+ var hsl=rgb2hsl(hex2rgb(hex)),h=hsl[0],s=hsl[1],l=hsl[2];
+ var target=t<0?228:44, amt=Math.abs(t);
+ var d=((target-h+540)%360)-180;
+ // 綠色帶（60–200）往冷色位移時強制往上繞，避免經過黃綠變成混濁色
+ if(t<0&&h>=60&&h<=200){d=((target-h)+360)%360;}
+ h=h+d*amt*0.34;
+ s=clamp(s+(t<0?amt*0.10:-amt*0.14),0,1);
+ l=clamp(l+t*0.26,0.03,0.97);
+ var out=hsl2hex(h,s,l);_shadeCache[k]=out;return out;}
+
+/* ============ 1. 常數 ============ */
+var ROAD_H=3.5;        // 半路寬
+var WALK_X=6.0;        // 人行道外緣 / 建築牆面
+var SPAWN_X=5.6;       // 行人起點
+var CAR_X=1.75;        // 車身中心
+var CAM_X=1.42;        // 駕駛眼睛（左駕）
+var CAM_Y=1.24;
+var CAR_HALF=0.86;     // 車身半寬（畫面/車道用）
+var HIT_HALF=0.60;     // 撞人判定半寬（比車身窄，判定沒那麼「大台」）
+var BUMPER=2.2;        // 車頭距離攝影機
+var YIELD_DIST=3.0;    // 停讓三公尺規則
+var STOPLINE_BACK=3.2; // 停止線在斑馬線前多遠
+var MAXSPD=100/3.6; // World speed is m/s; dashboard speed is km/h.
+
+var PAL={
+ asphalt:'#4b4a52', asphaltDark:'#3d3c44', line:'#e6e1d2', lineY:'#e0b23f',
+ walk:'#b3aa9c', curb:'#cfc7b8',
+ skyDay:['#78c0e6','#bfe2f0','#e8f1ee'],
+ skyDusk:['#2d3a6b','#a2557a','#e8a05c'],
+ skyNight:['#080c1c','#131c38','#26304f'],
+ skyRain:['#5d6a75','#8d9aa3','#adb6bb']
+};
+
+/* ============ 2. 行人劇本 ============ */
+var TYPES={
+ normal:{name:'路人',h:1.70,sp:1.25,cloth:'#4d78b8',pants:'#2f3a52',hair:'#241d1a',skin:'#e8bd97'},
+ granny:{name:'阿嬤',h:1.48,sp:0.36,cloth:'#c05b7a',pants:'#5c4a58',hair:'#cfcac3',skin:'#e2b490'},
+ hesitate:{name:'猶豫哥',h:1.74,sp:1.5,cloth:'#e0a13a',pants:'#3b4250',hair:'#1e1a17',skin:'#e8bd97'},
+ phone:{name:'低頭族',h:1.68,sp:1.0,cloth:'#3faf9a',pants:'#31384a',hair:'#171416',skin:'#eec3a0'},
+ dog:{name:'遛狗大叔',h:1.72,sp:0.95,cloth:'#6b8f4e',pants:'#4a4238',hair:'#3a3129',skin:'#dcb08a'},
+ dropper:{name:'遲到上班族',h:1.73,sp:3.0,cloth:'#d8d2c6',pants:'#232a38',hair:'#171416',skin:'#e8bd97'},
+ kid:{name:'小朋友',h:1.14,sp:0.92,cloth:'#f0d24a',pants:'#3c6fb0',hair:'#2a221d',skin:'#f0c9a4'},
+ taichi:{name:'太極阿伯',h:1.62,sp:1.0,cloth:'#cfd6d8',pants:'#7d8794',hair:'#d6d2cb',skin:'#d9ab84'},
+ selfie:{name:'網美',h:1.66,sp:1.3,cloth:'#e878a8',pants:'#f0ece6',hair:'#4a2a1e',skin:'#f3cdae'},
+ uturn:{name:'忘記帶鑰匙的人',h:1.71,sp:1.3,cloth:'#7d5bb5',pants:'#2e3444',hair:'#1c1815',skin:'#e2b58e'},
+ gossip:{name:'聊天阿姨',h:1.55,sp:1.0,cloth:'#e08a4a',pants:'#5a4a4a',hair:'#2b2320',skin:'#e5b78f'},
+ fridge:{name:'搬冰箱的',h:1.72,sp:0.42,cloth:'#8a8f96',pants:'#3a4048',hair:'#211c19',skin:'#dcae87'},
+ scooter:{name:'逆向外送員',h:1.70,sp:6.2,cloth:'#2fae6a',pants:'#22262e',hair:'#191519',skin:'#e0b48d'},
+ cat:{name:'貓',h:0.36,sp:5.0,cloth:'#8c7a68',pants:'#8c7a68',hair:'#6d5c4c',skin:'#8c7a68'},
+ drunk:{name:'喝多了的人',h:1.70,sp:0.9,cloth:'#b04a3a',pants:'#3a3038',hair:'#201a17',skin:'#e6b28c'}
+};
+TYPES.phone.cloth='#3faf9a';
+
+var LINES={
+ normal:['嗯，謝謝。','安全第一。'],
+ granny:['少年仔，等一下捏～','我腳不好啦……','再一下下就好。'],
+ hesitate:['等等……','啊我走錯邊。','算了我還是過好了。'],
+ phone:['……','再看一下下就好。','已讀不回什麼意思？'],
+ dog:['牠不走我也沒辦法。','來，尿完了沒？'],
+ dropper:['我遲到了啦！','啊我卡片掉了！'],
+ kid:['老師說要牽手手。','一二一二～'],
+ taichi:['心靜自然涼。','此乃天地之氣。'],
+ selfie:['這裡光線最好。','再一張就好。'],
+ uturn:['啊我瓦斯有沒有關？','等等我回去看一下。'],
+ gossip:['你知道嗎，她昨天……','真的假的啦！'],
+ fridge:['左邊左邊！','抬高一點啦！'],
+ scooter:['借過借過！','單子要超時了！'],
+ cat:['喵。'],
+ drunk:['我沒醉。','馬路是我家開的。']
+};
+var HONK_REACT={
+ normal:'fast', kid:'fast', phone:'fast', dropper:'fast', uturn:'fast', scooter:'fast', cat:'fast',
+ granny:'slow', dog:'slow', hesitate:'slow', fridge:'slow', selfie:'slow',
+ taichi:'rage', drunk:'rage', gossip:'rage'
+};
+var HONK_LINES={
+ fast:['好啦好啦！','是在急什麼','走了走了','歹勢歹勢','喔喔對不起'],
+ slow:['按三小？','按了我會走比較快嗎？','我腳不好啦','再按啊。','你很急喔。','那我走慢一點好了'],
+ rage:['你按什麼按！','你下車啊！','再按一次試試看','我記你車牌喔','你這樣開車很危險欸']
+};
+var RAGE_END=['下次注意點。','算了，跟你計較浪費我時間。','年輕人，做人客氣一點。','哼。'];
+
+
+// Each newcomer has a distinct silhouette, crossing script and voice.
+var CAST_EXTRAS={
+ runner:{name:'暴走馬拉松哥',h:1.83,sp:2.6,cloth:'#ed6844',pants:'#282d46',hair:'#2d211d',skin:'#c9936f',debut:3,look:'runner',width:0.092,lines:['還差一圈！','等我拉個筋！'],react:'fast'},
+ chef:{name:'甩鍋大廚',h:1.72,sp:1.1,cloth:'#f3eee0',pants:'#343742',hair:'#352923',skin:'#e0b18b',debut:4,look:'chef',width:0.145,topExtra:0.18,lines:['鍋氣不能停！','這鍋不是我的！'],react:'slow'},
+ tourist:{name:'迷路觀光客',h:1.81,sp:1.4,cloth:'#edb742',pants:'#73895c',hair:'#724c30',skin:'#f1c3a0',debut:5,look:'tourist',lines:['導航叫我在這裡迴轉？','這張地圖是不是拿反了？'],react:'slow'},
+ balloon:{name:'氣球快飛走了',h:1.61,sp:1.2,cloth:'#54b9cf',pants:'#7649a3',hair:'#5c302d',skin:'#edbd96',debut:6,look:'balloon',topExtra:0.42,lines:['不是我不走，是風在走！','抓住了！差一點！'],react:'fast'},
+ rocker:{name:'路口吉他手',h:1.87,sp:1.5,cloth:'#34283f',pants:'#272a3c',hair:'#c53a75',skin:'#ddb58e',debut:7,look:'rocker',topExtra:0.09,lines:['副歌來了！','這段 solo 不能剪！'],react:'rage'},
+ student:{name:'書比人高的學霸',h:1.46,sp:1.25,cloth:'#517dc1',pants:'#25385e',hair:'#211d28',skin:'#edc4a3',debut:8,look:'student',lines:['再背一頁就好……','這些全部都要考？'],react:'fast'},
+ painter:{name:'全身顏料的畫家',h:1.74,sp:1.1,cloth:'#d6c4a5',pants:'#456f77',hair:'#583b2c',skin:'#dfb38d',debut:9,look:'painter',lines:['等一下，靈感來了！','你的引擎蓋顏色不錯。'],react:'slow'},
+ magician:{name:'帽子漏兔子的魔術師',h:1.88,sp:1.3,cloth:'#463065',pants:'#282039',hair:'#272127',skin:'#e4b592',debut:10,look:'magician',topExtra:0.20,lines:['見證奇蹟的時刻！','兔子！回帽子裡！'],react:'rage'},
+ pineapple:{name:'鳳梨促銷員',h:1.72,sp:0.95,cloth:'#e4b62f',pants:'#40825f',hair:'#393020',skin:'#e3b895',debut:11,look:'pineapple',width:0.16,topExtra:0.22,lines:['買鳳梨送好運！','這套真的好熱……'],react:'slow'},
+ astronaut:{name:'月球散步員',h:1.94,sp:0.75,cloth:'#e7ecf0',pants:'#c3cbd6',hair:'#3d3530',skin:'#d9ae87',debut:12,look:'astronaut',width:0.15,lines:['地球重力有點強。','休士頓，我在等紅燈。'],react:'slow'},
+ robot:{name:'電量剩 1% 的機器人',h:1.80,sp:1.4,cloth:'#62a9b0',pants:'#3f6477',hair:'#405966',skin:'#c2dbe0',debut:13,look:'robot',width:0.145,topExtra:0.13,lines:['重新規劃路線……','電量不足，請勿催促。'],react:'slow'},
+ dancer:{name:'斑馬線舞王',h:1.76,sp:1.9,cloth:'#d350aa',pants:'#4e3787',hair:'#382338',skin:'#be875f',debut:14,look:'dancer',width:0.102,lines:['這條線就是我的舞台！','走路也要有節奏！'],react:'rage'}
+};
+Object.keys(CAST_EXTRAS).forEach(function(k){var t=CAST_EXTRAS[k];TYPES[k]=t;LINES[k]=t.lines;HONK_REACT[k]=t.react;});
+TYPES.normal.name='咖啡續命社畜';TYPES.hesitate.name='左右腦吵架哥';TYPES.kid.name='螺旋槳帽小朋友';
+TYPES.uturn.name='巨型鑰匙健忘哥';TYPES.drunk.name='領帶歪掉的醉漢';TYPES.cat.name='斑馬線虎斑貓';
+Object.keys(TYPES).forEach(function(k){TYPES[k].look=TYPES[k].look||k;});
+
+function makePlan(type,dir){
+ var s=dir>0?-SPAWN_X:SPAWN_X, e=-s;
+ var at=function(f){return lerp(s,e,f);};
+ switch(type){
+  case 'runner': return [{to:at(0.42),sp:2.6,anim:'run'},{wait:1.6,anim:'stretch'},{to:at(1),sp:3.2,anim:'run'}];
+  case 'chef': return [{to:at(0.50),sp:1.1,anim:'cook'},{wait:2.1,anim:'cook'},{to:at(1),sp:1.3,anim:'cook'}];
+  case 'tourist': return [{to:at(0.44),sp:1.4,anim:'map'},{wait:1.5,anim:'map'},{to:at(0.23),sp:1.8,anim:'map'},{to:at(1),sp:1.6,anim:'map'}];
+  case 'balloon': return [{to:at(0.36),sp:1.2,anim:'balloon'},{to:at(0.61),sp:2.2,anim:'balloon'},{wait:1.3,anim:'balloon'},{to:at(1),sp:1.6,anim:'balloon'}];
+  case 'rocker': return [{to:at(0.5),sp:1.5,anim:'guitar'},{wait:2.7,anim:'guitar'},{to:at(1),sp:1.7,anim:'guitar'}];
+  case 'student': return [{to:at(0.48),sp:1.25,anim:'books'},{wait:1.2,anim:'books'},{to:at(1),sp:1.25,anim:'books'}];
+  case 'painter': return [{to:at(0.58),sp:1.1,anim:'paint'},{wait:2.2,anim:'paint'},{to:at(1),sp:1.4,anim:'paint'}];
+  case 'magician': return [{to:at(0.50),sp:1.3,anim:'magic'},{wait:2.5,anim:'magic'},{to:at(1),sp:1.8,anim:'magic'}];
+  case 'pineapple': return [{to:at(0.46),sp:0.95,anim:'wave'},{wait:1.7,anim:'wave'},{to:at(1),sp:1.1,anim:'wave'}];
+  case 'astronaut': return [{to:at(0.3),sp:0.75,anim:'moonwalk'},{wait:0.6,anim:'moonwalk'},{to:at(0.65),sp:0.9,anim:'moonwalk'},{wait:0.8,anim:'moonwalk'},{to:at(1),sp:1.0,anim:'moonwalk'}];
+  case 'robot': return [{to:at(0.35),sp:1.4,anim:'robot'},{wait:1.4,anim:'robot'},{to:at(0.70),sp:1.8,anim:'robot'},{wait:0.8,anim:'robot'},{to:at(1),sp:2.0,anim:'robot'}];
+  case 'dancer': return [{to:at(0.48),sp:1.9,anim:'dance'},{to:at(0.34),sp:1.6,anim:'dance'},{wait:1.8,anim:'dance'},{to:at(1),sp:2.1,anim:'dance'}];
+  case 'granny': return [{to:at(0.45),sp:0.36},{wait:1.0,anim:'rest'},{to:at(1),sp:0.34}];
+  case 'hesitate': return [{to:at(0.52),sp:1.6},{wait:0.25},{to:at(0.04),sp:2.9,anim:'run'},{wait:1.9,anim:'think'},{to:at(1),sp:1.15}];
+  case 'phone': return [{to:at(0.32),sp:1.0,anim:'phone'},{wait:1.7,anim:'phone'},{to:at(0.62),sp:1.0,anim:'phone'},{wait:1.9,anim:'phone'},{to:at(1),sp:1.0,anim:'phone'}];
+  case 'dog': return [{to:at(0.42),sp:0.95},{wait:3.4,anim:'sniff'},{to:at(1),sp:0.95}];
+  case 'dropper': return [{to:at(0.52),sp:3.0,anim:'run'},{wait:0.3,anim:'drop'},{to:at(0.3),sp:2.6,anim:'run'},{wait:2.0,anim:'pick'},{to:at(1),sp:3.2,anim:'run'}];
+  case 'taichi': return [{to:at(0.5),sp:1.0},{wait:4.6,anim:'taichi'},{to:at(1),sp:1.0}];
+  case 'selfie': return [{to:at(0.55),sp:1.3},{wait:3.4,anim:'selfie'},{to:at(1),sp:1.3}];
+  case 'uturn': return [{to:at(1),sp:1.35},{wait:0.5,anim:'think'},{to:at(0.02),sp:1.35},{wait:0.6,anim:'think'},{to:at(1),sp:1.5}];
+  case 'gossip': return [{to:at(0.5),sp:1.05},{wait:5.0,anim:'talk'},{to:at(1),sp:1.05}];
+  case 'fridge': return [{to:at(1),sp:0.42,anim:'carry'}];
+  case 'scooter': return [{to:at(1),sp:6.2,anim:'ride'}];
+  case 'cat': return [{to:at(0.38),sp:5.0},{wait:1.3,anim:'sit'},{to:at(1),sp:5.6}];
+  case 'drunk': return [{to:at(0.25),sp:0.95},{to:at(0.18),sp:0.7},{to:at(0.55),sp:1.0},{wait:0.8,anim:'think'},{to:at(0.45),sp:0.7},{to:at(1),sp:0.95}];
+  case 'kid': return [{to:at(0.5),sp:0.92},{wait:0.7},{to:at(1),sp:0.92}];
+  default: return [{to:at(1),sp:1.25}];
+ }
+}
+
+/* ============ 3. 關卡 ============ */
+var LEVELS=[
+ {name:'駕訓班第一天',hint:'看到行人就停。很難嗎？',time:70,goal:120,sky:'day',
+  cross:[{z:75,peds:[{t:'normal',d:1}]}]},
+ {name:'阿嬤的一小步',hint:'她走得慢，你的人生不會因此毀掉。',time:80,goal:125,sky:'day',
+  cross:[{z:78,peds:[{t:'granny',d:-1}]}]},
+ {name:'到底要不要過',hint:'有些人自己也不知道自己要幹嘛。',time:82,goal:135,sky:'day',
+  cross:[{z:82,peds:[{t:'hesitate',d:1},{t:'normal',d:-1}]}]},
+ {name:'紅燈停，綠燈行',hint:'紅燈是給你停的，不是給你參考的。',time:100,goal:205,sky:'day',
+  cross:[{z:72,light:{g:8,y:2,r:8,off:0},peds:[{t:'normal',d:1}]},
+         {z:158,light:{g:7,y:2,r:9,off:6},peds:[{t:'normal',d:-1},{t:'granny',d:1}]}]},
+ {name:'低頭族出沒',hint:'他不看路，只好你幫他看。',time:95,goal:190,sky:'day',
+  cross:[{z:72,peds:[{t:'phone',d:1}]},
+         {z:148,peds:[{t:'phone',d:-1},{t:'normal',d:1}]}]},
+ {name:'遛狗時間',hint:'狗要聞多久，沒有人知道。',time:100,goal:200,sky:'day',
+  cross:[{z:72,peds:[{t:'dog',d:1}]},
+         {z:155,peds:[{t:'granny',d:-1},{t:'normal',d:-1}]}]},
+ {name:'遲到的上班族',hint:'跑超快，然後東西掉了。',time:100,goal:205,sky:'day',
+  cross:[{z:72,peds:[{t:'dropper',d:1}]},
+         {z:158,peds:[{t:'hesitate',d:-1},{t:'phone',d:1}]}]},
+ {name:'放學路口',hint:'一個接一個，數到你懷疑人生。',time:115,goal:210,sky:'day',
+  cross:[{z:75,peds:[{t:'kid',d:1,n:5,gap:1.7}]},
+         {z:160,light:{g:8,y:2,r:10,off:3},peds:[{t:'kid',d:-1,n:4,gap:1.9},{t:'normal',d:-1}]}]},
+ {name:'公園的早晨',hint:'馬路中間打太極，天人合一。',time:115,goal:215,sky:'day',
+  cross:[{z:72,peds:[{t:'taichi',d:1}]},
+         {z:162,peds:[{t:'granny',d:1},{t:'dog',d:-1}]}]},
+ {name:'網美打卡點',hint:'斑馬線是拍照聖地，你懂什麼。',time:120,goal:230,sky:'dusk',
+  cross:[{z:72,peds:[{t:'selfie',d:1}]},
+         {z:150,peds:[{t:'uturn',d:-1}]},
+         {z:196,peds:[{t:'phone',d:1}]}]},
+ {name:'今天搬家',hint:'兩個人抬一台冰箱，時速零點四。',time:125,goal:235,sky:'dusk',
+  cross:[{z:74,peds:[{t:'fridge',d:1}]},
+         {z:156,peds:[{t:'gossip',d:-1,n:2,gap:0.9}]},
+         {z:200,peds:[{t:'normal',d:1},{t:'granny',d:-1}]}]},
+ {name:'巷口驚魂',hint:'有些東西不會等你，會直接衝出來。',time:120,goal:240,sky:'day',
+  cross:[{z:70,peds:[{t:'cat',d:1},{t:'normal',d:-1}]},
+         {z:145,peds:[{t:'scooter',d:-1},{t:'granny',d:1}]},
+         {z:200,peds:[{t:'hesitate',d:1},{t:'phone',d:-1}]}]},
+ {name:'雨天路滑',hint:'煞車距離會變長。別問我怎麼知道。',time:130,goal:250,sky:'rain',
+  cross:[{z:72,peds:[{t:'granny',d:1}]},
+         {z:150,light:{g:7,y:2,r:9,off:2},peds:[{t:'phone',d:-1},{t:'kid',d:1,n:3,gap:1.6}]},
+         {z:212,peds:[{t:'dropper',d:-1}]}]},
+ {name:'夜市散場',hint:'人潮從四面八方而來，喇叭沒有用。',time:140,goal:265,sky:'night',
+  cross:[{z:70,peds:[{t:'gossip',d:1,n:2,gap:0.9},{t:'phone',d:-1}]},
+         {z:150,peds:[{t:'drunk',d:-1},{t:'kid',d:1,n:3,gap:1.5}]},
+         {z:222,peds:[{t:'selfie',d:1},{t:'normal',d:-1}]}]},
+ {name:'最終路考',hint:'考官坐在後座。他什麼都看得到。',time:165,goal:330,sky:'day',
+  cross:[{z:66,peds:[{t:'hesitate',d:1}]},
+         {z:132,light:{g:6,y:2,r:9,off:1},peds:[{t:'granny',d:-1},{t:'dog',d:1}]},
+         {z:198,peds:[{t:'kid',d:1,n:5,gap:1.6},{t:'cat',d:-1}]},
+         {z:262,peds:[{t:'taichi',d:-1},{t:'dropper',d:1}]},
+         {z:300,peds:[{t:'phone',d:1},{t:'uturn',d:-1}]}]},
+
+ /* ===== 右轉關卡（方向鍵控制轉向） ===== */
+ {name:'十字路口右轉',hint:'到路口右轉，禮讓你要轉進去那條路上的行人。',time:120,goal:185,sky:'day',steer:true,junc:true,
+  bends:[{z:53,len:22,ang:Math.PI/2}],
+  cross:[{z:44,peds:[{t:'normal',d:1}]},                               // 轉彎前，橫過你這條路
+         {z:82,peds:[{t:'granny',d:-1},{t:'phone',d:1}]},              // 轉進去那條路（主要禮讓）
+         {z:142,peds:[{t:'normal',d:-1}]}]},
+ {name:'十字路口左轉',hint:'到路口左轉，就算對向沒車，也要讓行人先過。',time:130,goal:200,sky:'dusk',steer:true,junc:true,
+  bends:[{z:52,len:24,ang:-Math.PI/2}],
+  cross:[{z:44,peds:[{t:'phone',d:-1}]},
+         {z:84,peds:[{t:'kid',d:1,n:3,gap:1.6},{t:'normal',d:-1}]},    // 轉進去那條路
+         {z:150,peds:[{t:'granny',d:1}]}]},
+ {name:'繁忙十字路口',hint:'先右轉再左轉，兩個路口人都沒停過。方向、油門、禮讓一起顧。',time:170,goal:265,sky:'day',steer:true,junc:true,
+  bends:[{z:48,len:22,ang:Math.PI/2},{z:150,len:24,ang:-Math.PI/2}],
+  cross:[{z:40,peds:[{t:'normal',d:1}]},
+         {z:76,peds:[{t:'granny',d:-1},{t:'hesitate',d:1}]},           // 第一個路口轉進去
+         {z:120,light:{g:7,y:2,r:9,off:2},peds:[{t:'phone',d:-1}]},
+         {z:176,peds:[{t:'kid',d:1,n:3,gap:1.5},{t:'dog',d:-1}]},      // 第二個路口轉進去
+         {z:232,peds:[{t:'normal',d:1},{t:'uturn',d:-1}]}]}
+];
+
+
+// First crossing introduces a star; later crossings remix the established cast.
+var LEVEL_DEBUTS=['normal','granny','hesitate','runner','phone','dog','dropper','kid','taichi','selfie','fridge','cat','astronaut','gossip','painter','chef','tourist','rocker','balloon','magician','pineapple','robot','dancer','student'];
+[
+ ['小綠人倒數','氣球在飄，小綠人在倒數；先看車輛號誌，再留意行人。','day',false],
+ ['紅燈擋不住魔術師','車輛綠燈也可能有人闖入；有行人就先停讓。','dusk',true],
+ ['鳳梨街頭嘉年華','新人先登場，後面是熟面孔大集合。','day',false],
+ ['機器人沒電了','小綠人倒數中，機器人卻開始重新開機。','night',false],
+ ['舞王不看紅綠燈','有人守規矩，有人踩著紅燈跳出來。','day',true],
+ ['全員混亂畢業考','學霸先登場，接著連續四波混搭；號誌與行人都要看。','day',true]
+].forEach(function(spec,n){
+ var cross=[44,84,155,225];if(n===5)cross=[44,84,150,215,280];
+ var bend={z:53,len:22,ang:n%2?-Math.PI/2:Math.PI/2};
+ LEVELS.push({name:spec[0],hint:spec[1],sky:spec[2],time:240,goal:cross[cross.length-1]+55,steer:true,junc:true,
+  bends:[bend],
+  cross:cross.map(function(z,i){
+   // 「你轉進去那條路」的斑馬線（就在路口內）：綠燈轉進去只需禮讓行人，不再受一個獨立紅燈管制，
+   //  否則會被卡在十字路口中間、甚至誤判闖紅燈。其餘（進入前、轉出後直行段）維持小綠人號誌。
+   if(z>=bend.z && z<=bend.z+bend.len+18)
+    return {z:z,peds:[],turnInto:true,jaywalkStage:spec[3]};
+   return {z:z,peds:[],pedSignal:true,jaywalkStage:spec[3],light:{g:18,y:3,r:24,off:i*7}};
+  })});
+});
+function crossingSeconds(type){
+ var x=-SPAWN_X,total=0;makePlan(type,1).forEach(function(st){if(st.wait!=null)total+=st.wait;else{total+=Math.abs(st.to-x)/st.sp;x=st.to;}});return total;
+}
+(function configureCrowds(){
+ var known=[];
+ LEVELS.forEach(function(L,idx){
+  var star=LEVEL_DEBUTS[idx];
+  // Preserve the returning-key gag and delivery rider as supporting debuts.
+  if(idx===10&&known.indexOf('uturn')<0)known.push('uturn');
+  if(idx===11&&known.indexOf('scooter')<0)known.push('scooter');
+  if(idx===13&&known.indexOf('drunk')<0)known.push('drunk');
+  if(idx===2){L.cross.push({z:145,peds:[]});L.goal=190;}
+  if(idx>=6&&idx<15&&L.cross.length<3){var last=L.cross[L.cross.length-1].z;L.cross.push({z:last+60,peds:[]});L.goal=Math.max(L.goal,last+110);}
+  var used=[],counts=[],total=0;
+  L.cross.forEach(function(c,ci){
+   var count=ci===0?1:(idx<6?Math.min(4,2+Math.floor(idx/3)):idx<12?4+(ci%2):idx<18?5+(ci%2):7+(ci%3));
+   var pool=known.filter(function(t){return t!==star;});count=ci===0?1:Math.min(count,pool.length);
+   c.peds=[];
+   for(var slot=0;slot<count;slot++){
+    var type=star;
+    if(ci>0){
+     var available=pool.filter(function(t){return used.indexOf(t)<0&& !c.peds.some(function(p){return p.t===t;});});
+     if(!available.length)available=pool.filter(function(t){return !c.peds.some(function(p){return p.t===t;});});
+     type=available[(idx*5+ci*3+slot*7)%available.length];used.push(type);
+    }
+    c.peds.push({t:type,d:slot%2?-1:1,delay:Math.floor(slot/2)*0.65,variant:idx*37+ci*11+slot,
+     jaywalk:!!(c.jaywalkStage&&(ci===0||slot===1||slot===count-1))});
+   }
+   counts.push(count);total+=count;
+   if(c.pedSignal){var longest=Math.max.apply(null,c.peds.map(function(p){return crossingSeconds(p.t)+(p.delay||0);}));c.light.r=Math.max(20,Math.ceil(longest)+7);}
+  });
+  // Budget for walking, stopping, and at most one missed signal cycle per crossing.
+  var budget=L.goal/7+22;
+  L.cross.forEach(function(c){var d=Math.max.apply(null,c.peds.map(function(p){return crossingSeconds(p.t)+(p.delay||0);}));budget+=d+3+(c.light?c.light.g+c.light.y+c.light.r:0);});
+  L.time=Math.max(L.time,Math.ceil(budget));L.castCount=total;L.crowdCounts=counts;
+  L.hint='本關新人：'+TYPES[star].name+'。'+L.hint;
+  if(known.indexOf(star)<0)known.push(star);
+ });
+})();
+
+var LEAD={cat:1.9,scooter:2.1,dropper:2.4,hesitate:3.0,uturn:3.0};
+function leadOf(t){return LEAD[t]!=null?LEAD[t]:3.2;}
+
+var TAILCARS=[
+ {n:'計程車',body:'#e8b83a',glass:'#2b3340',taxi:true},
+ {n:'藍色小貨車',body:'#37629f',glass:'#2b3340',truck:true},
+ {n:'黑色轎車',body:'#1e222a',glass:'#333c4c'},
+ {n:'紅色房車',body:'#bf3b30',glass:'#2b3340'},
+ {n:'白色休旅車',body:'#e2e0da',glass:'#2b3340',tall:true},
+ {n:'銀色轎車',body:'#a8adb4',glass:'#2b3340'},
+ {n:'改裝車',body:'#7a3fb5',glass:'#1b2030',low:true},
+ {n:'遊覽車',body:'#d8d2c2',glass:'#31404f',bus:true}
+];
+
+var SHOPS=['阿宗麵線','正宗牛肉麵','發財彩券行','阿伯機車行','檳榔','古早味豆花','全民藥局','鹹酥雞','自助洗衣','土地公廟','珍珠奶茶','刈包大王','五金百貨','大腸麵線','早安美芝城','水電行','宮廟金紙','剪髮100'];
+
+/* ============ 4. 存檔 ============ */
+var mem={};
+var Store={
+ set:function(k,v){try{localStorage.setItem(k,v);return;}catch(e){}
+  try{sessionStorage.setItem(k,v);return;}catch(e){} mem[k]=v;},
+ get:function(k){try{var v=localStorage.getItem(k);if(v!=null)return v;}catch(e){}
+  try{var v2=sessionStorage.getItem(k);if(v2!=null)return v2;}catch(e){} return mem[k]!=null?mem[k]:null;}
+};
+var save={unlocked:1,stars:{}};
+(function(){var raw=Store.get('yield_save');if(raw){try{var o=JSON.parse(raw);if(o&&o.stars){save=o;}}catch(e){}}})();
+function persist(){try{Store.set('yield_save',JSON.stringify(save));}catch(e){}}
+
+/* ============ 5. 音效 ============ */
+var AC=null,masterGain=null,engOsc=null,engGain=null,engFilt=null,audioOn=true;
+function initAudio(){
+ if(AC)return; if(typeof window==='undefined')return;
+ try{
+  var C=window.AudioContext||window.webkitAudioContext; if(!C)return;
+  AC=new C(); masterGain=AC.createGain(); masterGain.gain.value=0.5; masterGain.connect(AC.destination);
+  engOsc=AC.createOscillator(); engOsc.type='sawtooth'; engOsc.frequency.value=48;
+  engFilt=AC.createBiquadFilter(); engFilt.type='lowpass'; engFilt.frequency.value=340;
+  engGain=AC.createGain(); engGain.gain.value=0;
+  engOsc.connect(engFilt); engFilt.connect(engGain); engGain.connect(masterGain); engOsc.start();
+ }catch(e){AC=null;}
+}
+function engine(spd,gas){ if(!AC||!audioOn){if(engGain)engGain.gain.value=0;return;}
+ var f=44+spd*7.5; engOsc.frequency.setTargetAtTime(f,AC.currentTime,0.08);
+ engFilt.frequency.setTargetAtTime(300+spd*70+(gas?250:0),AC.currentTime,0.1);
+ engGain.gain.setTargetAtTime(0.035+Math.min(spd,MAXSPD)/MAXSPD*0.05+(gas?0.02:0),AC.currentTime,0.12);}
+function noise(dur,f,q,vol,type){ if(!AC||!audioOn)return;
+ var n=Math.floor(AC.sampleRate*dur),buf=AC.createBuffer(1,n,AC.sampleRate),d=buf.getChannelData(0);
+ for(var i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);
+ var src=AC.createBufferSource();src.buffer=buf;
+ var bp=AC.createBiquadFilter();bp.type=type||'bandpass';bp.frequency.value=f;bp.Q.value=q;
+ var g=AC.createGain();g.gain.value=vol;
+ src.connect(bp);bp.connect(g);g.connect(masterGain);src.start();}
+function tone(f,dur,type,vol,dly){ if(!AC||!audioOn)return;
+ var t=AC.currentTime+(dly||0);
+ var o=AC.createOscillator();o.type=type||'square';o.frequency.value=f;
+ var g=AC.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol||0.14,t+0.012);
+ g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+ o.connect(g);g.connect(masterGain);o.start(t);o.stop(t+dur+0.05);}
+function sfxHorn(){tone(415,0.42,'square',0.11);tone(494,0.42,'square',0.09);}
+function sfxCrash(){noise(0.5,900,0.7,0.5,'lowpass');tone(78,0.5,'sawtooth',0.2);}
+function sfxSkid(){noise(0.34,1900,3,0.14);}
+function sfxOk(){tone(660,0.14,'sine',0.13);tone(880,0.2,'sine',0.12,0.1);}
+function sfxWin(){[523,659,784,1046].forEach(function(f,i){tone(f,0.3,'triangle',0.13,i*0.11);});}
+function sfxFail(){[440,370,294,220].forEach(function(f,i){tone(f,0.32,'sawtooth',0.11,i*0.12);});}
+function sfxThud(){noise(0.16,180,0.9,0.42,'lowpass');tone(96,0.17,'sine',0.16);}
+function sfxBounce(){noise(0.22,320,1.2,0.3,'lowpass');tone(70,0.24,'sine',0.14);}
+function sfxTick(){tone(1200,0.05,'square',0.05);}
+
+/* ============ 6. 遊戲狀態 ============ */
+var cv,g,W=900,H=600,DPR=1,HZ=250,FOCAL=600;
+var scene='title';
+var G=null;
+
+/* ---- 真實彎道：道路中心線沿「里程」積分曲率，得到每一點的車頭朝向 φ 與世界座標 ---- */
+/* bends: [{z, len, ang}]  ang=該段總轉向角(弧度, 正=右轉)。里程 z 即 carZ 走過的距離。 */
+var CURVE=null;
+function curveKappaAt(z){          // 該里程處的瞬時曲率（弧度/公尺，正=右）
+ if(!G||!G.bends)return 0;
+ var k=0;
+ for(var i=0;i<G.bends.length;i++){
+  var b=G.bends[i];
+  if(z>=b.z&&z<=b.z+b.len){
+   var u=(z-b.z)/b.len;           // 0..1
+   k+=(b.ang/b.len)*(6*u*(1-u));  // 鐘形分布，積分=b.ang，兩端平滑
+  }
+ }
+ return k;
+}
+function buildCurve(L){
+ var step=0.5, max=(L.goal||300)+300, n=Math.ceil(max/step)+2;
+ var phi=new Float64Array(n), cx=new Float64Array(n), cz=new Float64Array(n);
+ var bends=L.bends||[], ph=0,X=0,Z=0;
+ function kap(z){var k=0;for(var i=0;i<bends.length;i++){var b=bends[i];if(z>=b.z&&z<=b.z+b.len){var u=(z-b.z)/b.len;k+=(b.ang/b.len)*(6*u*(1-u));}}return k;}
+ for(var i=1;i<n;i++){
+  var z0=(i-1)*step;
+  ph+=kap(z0+step*0.5)*step;
+  X+=Math.sin(ph)*step; Z+=Math.cos(ph)*step;
+  phi[i]=ph; cx[i]=X; cz[i]=Z;
+ }
+ CURVE={step:step,phi:phi,cx:cx,cz:cz,n:n};
+}
+function curveSample(z){            // 里程 z 處：車頭朝向 phi、世界座標 (x=東, z=北)
+ if(!CURVE||z<=0)return {phi:0,x:0,z:z<0?z:z};
+ var f=z/CURVE.step, i=f|0, t=f-i;
+ if(i>=CURVE.n-1){i=CURVE.n-2;t=1;}
+ return {phi:CURVE.phi[i]+(CURVE.phi[i+1]-CURVE.phi[i])*t,
+         x:CURVE.cx[i]+(CURVE.cx[i+1]-CURVE.cx[i])*t,
+         z:CURVE.cz[i]+(CURVE.cz[i+1]-CURVE.cz[i])*t};
+}
+/* 車輛在車道內的橫向位置（0=中心線；右車道中心=CAR_X）。彎道由 project 處理，這裡直接是 carWX。 */
+function carLaneX(){ return G?G.carWX:CAR_X; }
+
+/* wx=距道路中心線的橫向偏移；wy=高度；dz=沿道路里程的前方距離 */
+function project(wx,wy,dz){
+ var z=dz<0.4?0.4:dz;
+ if(!G){ var s0=FOCAL/z; return {x:W*0.5+(wx-CAM_X)*s0, y:HZ+(CAM_Y-wy)*s0, s:s0}; }
+ var cc=curveSample(G.carZ), pc=curveSample(G.carZ+dz);
+ var sc=Math.sin(cc.phi), cs=Math.cos(cc.phi);
+ var camLat=G.carWX-0.33;
+ // perpRight(phi) = (cos phi, -sin phi)；攝影機世界座標
+ var camE=cc.x+camLat*cs, camN=cc.z-camLat*sc;
+ var s2=Math.sin(pc.phi), c2=Math.cos(pc.phi);
+ var pE=pc.x+wx*c2, pN=pc.z-wx*s2;
+ var dE=pE-camE, dN=pN-camN;
+ var forward=dE*sc+dN*cs;          // 旋轉 -phic 後的前向深度
+ var right=dE*cs-dN*sc;
+ if(forward<0.45)forward=0.45;
+ var s=FOCAL/forward;
+ return {x:W*0.5+right*s, y:HZ+(CAM_Y-wy)*s, s:s};
+}
+
+function makeBuildings(goal,seed){
+ var r=mulberry(seed),arr=[],side,z;
+ for(side=-1;side<=1;side+=2){
+  z=-14;
+  while(z<goal+90){
+   var len=rnd0(r,7,14), h=rnd0(r,4.5,11);
+   arr.push({side:side,z:z,len:len,h:h,
+    col:(r()<0.34?hsl2hex(rnd0(r,190,225),rnd0(r,0.03,0.10),rnd0(r,0.55,0.80))
+                 :hsl2hex(rnd0(r,16,50),rnd0(r,0.06,0.22),rnd0(r,0.46,0.76))),
+    shutter:hsl2hex(rnd0(r,0,360),rnd0(r,0.10,0.45),rnd0(r,0.30,0.52)),
+    sign:SHOPS[(arr.length*7+(side>0?3:0))%SHOPS.length],
+    signCol:hsl2hex(rnd0(r,0,360),rnd0(r,0.55,0.85),rnd0(r,0.36,0.52)),
+    hasSign:r()<0.72, floors:Math.max(2,Math.floor(h/3))});
+   z+=len+rnd0(r,0.3,1.4);
+  }
+ }
+ return arr;
+}
+function rnd0(r,a,b){return a+r()*(b-a);}
+
+function spawnPeds(cross,ci){
+ var out=[];
+ (cross.peds||[]).forEach(function(cfg,pi){
+  var n=cfg.n||1;
+  for(var i=0;i<n;i++){
+   var baseT=TYPES[cfg.t]||TYPES.normal;
+   var tint=((cfg.variant||0)%5-2)*0.045;
+   var T=Object.assign({},baseT,{cloth:shade(baseT.cloth,tint)});
+   var d=cfg.d||1;
+   var plan=makePlan(cfg.t,d);
+   var start=d>0?-SPAWN_X:SPAWN_X;
+   var back=(cfg.gap||1.4)*i;
+   out.push({
+    key:ci+'_'+pi+'_'+i, type:cfg.t, T:T, crossZ:cross.z, ci:ci,
+    x:start-d*back, z:cross.z+((pi%2)?0.9:-0.9)+(i%2?0.5:-0.5)+rnd(-0.25,0.25),
+    dir:d, plan:plan, step:0, wait:0, phase:rnd(0,6.28), moving:false,
+    started:false, done:false, lead:(cfg.tr!=null?cfg.tr:leadOf(cfg.t)), delay:cfg.delay||0, jaywalk:!!cfg.jaywalk, variant:cfg.variant||0,
+    anim:null, slow:0, bubble:null, bubbleT:0, h:T.h, credited:false,
+    r:(cfg.t==='fridge')?1.35:(cfg.t==='cat'?0.22:0.42)
+   });
+   var np=out[out.length-1];
+   np.homeZ=np.z; np.y=0; np.rot=0; np.fast=0; np.rage=null; np.lastX=np.x;
+   var edge=(d>0)?-4.3:4.3;
+   var sp0=(plan[0]&&plan[0].sp)?plan[0].sp:1.2;
+   np.walkIn=Math.max(0,Math.abs(edge-np.x))/sp0;
+  }
+ });
+ return out;
+}
+
+function startLevel(idx){
+ var L=LEVELS[idx];
+ buildCurve(L);
+ var rain=L.sky==='rain', night=L.sky==='night';
+ G={
+  idx:idx,L:L,carZ:0,spd:0,gas:false,brake:false,
+  carWX:CAR_X, steer:0, steerInput:0, turnPhase:0, offT:0, offWarn:0,
+  steerLevel:true, bends:(L.bends?L.bends.slice():null),
+  juncs:(L.junc&&L.bends)?L.bends.map(function(b){return {z:b.z+b.len*0.5,bend:b};}):null,
+  t:0,left:L.time,ok:true,over:false,result:null,
+  shake:0,bob:0,honks:0,yields:0,score:0,
+  rain:rain,night:night,
+  brakePow:rain?5.0:8.6, accel:rain?3.5:4.4,
+  buildings:makeBuildings(L.goal,idx*977+13),
+  crosses:L.cross.map(function(c,i){
+   return {z:c.z,pedSignal:!!c.pedSignal,light:c.light?{g:c.light.g,y:c.light.y,r:c.light.r,off:c.light.off||0}:null,
+    stopZ:c.z-STOPLINE_BACK, passed:false, peds:spawnPeds(c,i), yieldedShown:false, wasBlocked:false, violated:false};
+  }),
+  peds:[], toasts:[], wiper:0, blocked:false, tut:0, tailHonk:0, tailT:6, stopT:0,
+  hornCool:0, crash:null, rages:0,
+  tail:{z:-15,spd:0,honk:0,flash:0,mad:0,kind:TAILCARS[idx%TAILCARS.length]}
+ };
+ G.crosses.forEach(function(c){G.peds=G.peds.concat(c.peds);});
+ if(G.juncs)G.buildings=G.buildings.filter(function(o){return !G.bends.some(function(b){return o.z<b.z+b.len+22&&o.z+o.len>b.z-22;});});
+ scene='play';
+ if(typeof document!=='undefined'){
+  var pad=document.getElementById('pad');
+  var sL=document.getElementById('bLeft'), sR=document.getElementById('bRight');
+  if(pad)pad.classList.add('steer');
+  if(sL)sL.hidden=false;
+  if(sR)sR.hidden=false;
+ }
+ initAudio();
+ if(AC&&AC.state==='suspended'){try{AC.resume();}catch(e){}}
+}
+
+/* ---- 號誌 ---- */
+function lightState(c,t){
+ if(!c.light)return null;
+ var L=c.light, cyc=L.g+L.y+L.r, p=((t+L.off)%cyc+cyc)%cyc;
+ if(p<L.g)return {s:'g',left:L.g-p};
+ if(p<L.g+L.y)return {s:'y',left:L.g+L.y-p};
+ return {s:'r',left:cyc-p};
+}
+
+
+function pedLightState(c,t){
+ var st=lightState(c,t);if(!st)return null;
+ if(st.s==='r'&&st.left>2)return {s:'g',left:st.left-2,flash:st.left<=7};
+ return {s:'r',left:st.s==='r'?st.left:st.left+(st.s==='g'?c.light.y:0),flash:false};
+}
+
+/* ---- 行人更新 ---- */
+function updateRage(p,dt,G){
+ var r=p.rage;
+ if(p.bubbleT>0)p.bubbleT-=dt;
+ r.t+=dt;
+ if(r.ph==='come'){
+  if(G.spd>4){ r.ph='back'; r.t=0; p.bubble='你跑什麼跑！'; p.bubbleT=2.4; return; }
+  p.anim='run'; p.moving=true; p.phase+=dt*10;
+  var tx=carLaneX(), tz=G.carZ+BUMPER+1.0;
+  var dx=tx-p.x, dz=tz-p.z, d=Math.sqrt(dx*dx+dz*dz);
+  if(d<0.4||r.t>8){ r.ph='bang'; r.t=0; r.next=0.25;
+   p.bubble=HONK_LINES.rage[Math.floor(Math.random()*HONK_LINES.rage.length)]; p.bubbleT=2.6; }
+  else { var sp=2.1; p.x+=dx/d*sp*dt; p.z=clamp(p.z+dz/d*sp*dt,p.homeZ-14,p.homeZ+14); }
+  return;
+ }
+ if(r.ph==='bang'){
+  p.anim='bang'; p.moving=false;
+  var lim=G.carZ+BUMPER+1.0;
+  if(p.z>lim)p.z=lim;
+  if(r.t>r.next){ r.next=r.t+0.40; G.shake=Math.min(1,G.shake+0.42); sfxThud();
+   if(Math.random()<0.4){p.bubble=HONK_LINES.rage[Math.floor(Math.random()*HONK_LINES.rage.length)];p.bubbleT=2.0;} }
+  if(r.t>r.dur){ r.ph='back'; r.t=0;
+   p.bubble=RAGE_END[Math.floor(Math.random()*RAGE_END.length)]; p.bubbleT=2.4; }
+  return;
+ }
+ p.anim=null; p.moving=true; p.phase+=dt*6;
+ var d2=p.homeZ-p.z;
+ p.z+=clamp(d2,-1,1)*2.2*dt;
+ if(Math.abs(d2)<0.25){ p.z=p.homeZ; p.rage=null; p.moving=false; }
+}
+
+function updatePed(p,dt,G){
+ if(p.done)return;
+ if(p.rage)return updateRage(p,dt,G);
+ if(p.bubbleT>0)p.bubbleT-=dt;
+ if(p.slow>0)p.slow-=dt;
+ if(p.fast>0)p.fast-=dt;
+ if(!p.started){
+  var cross=G.crosses[p.ci];
+  var go=false;
+  if(cross.light){
+   var ls=lightState(cross,G.t), ps=pedLightState(cross,G.t);
+   if(p.jaywalk){
+    var approach=p.crossZ-STOPLINE_BACK-(G.carZ+BUMPER);
+    go=ls.s==='g'&&approach>0&&approach/Math.max(G.spd,9.5)<=p.lead+p.walkIn;
+    // If the driver waited out the vehicle green, still allow a normal crossing.
+    if(!go&&ps.s==='g')go=ps.left>crossingSeconds(p.type)+p.delay+0.8;
+   }else if(cross.pedSignal){go=ps.s==='g'&&ps.left>crossingSeconds(p.type)+p.delay+0.8;}
+   else go=ls.s==='r';
+  }
+  else {
+   var dist=(p.crossZ-STOPLINE_BACK)-(G.carZ+BUMPER);
+   var v=Math.max(G.spd,9.5);
+   go=(dist<170) && ((dist/v) <= (p.lead+p.walkIn));
+  }
+  if(go){ if(p.delay>0){p.delay-=dt;return;} p.started=true;
+   if(p.jaywalk&&cross.pedSignal&&pedLightState(cross,G.t).s==='r'){
+    p.bubble='紅燈？我先過一下！';p.bubbleT=2.8;
+    if(!cross.jaywalkWarned){cross.jaywalkWarned=true;toast('有人闖行人紅燈！綠燈也要停讓','#ffb968');}
+   }else say(p,LINES[p.type]||LINES.normal,0.35);}
+  else return;
+ }
+ var st=p.plan[p.step];
+ if(!st){p.done=true;p.moving=false;return;}
+ if(st.wait!=null){
+  p.moving=false; p.anim=st.anim||null;
+  p.wait+=dt;
+  if(p.wait>=st.wait){p.wait=0;p.step++;p.anim=null;}
+  return;
+ }
+ p.anim=st.anim||null;
+ var sp=st.sp*(p.slow>0?0.45:1)*(p.fast>0?1.95:1);
+ var dir=st.to>p.x?1:-1;
+ p.dir=dir;
+ p.x+=dir*sp*dt;
+ p.moving=true;
+ p.phase+=dt*(4.2+sp*1.8);
+ if((dir>0&&p.x>=st.to)||(dir<0&&p.x<=st.to)){p.x=st.to;p.step++;p.wait=0;}
+ if(Math.abs(p.x)>SPAWN_X+0.4&&p.step>=p.plan.length){p.done=true;p.moving=false;}
+}
+function say(p,arr,delay){
+ if(!arr||!arr.length)return;
+ p.bubble=arr[Math.floor(Math.random()*arr.length)];
+ p.bubbleT=2.4;
+}
+function onCrosswalk(p){return Math.abs(p.x)<=4.3 && !p.done;}
+/* 行人是否已走過「我的車道」→ 走過車身那一側就算通過，不用再等他走完整條斑馬線 */
+function clearedLane(p){
+ var cx=carLaneX(), M=0.5;
+ if(p.dir>0 && p.x> cx+CAR_HALF+M) return true;   // 往右走且已越過車身右緣
+ if(p.dir<0 && p.x< cx-CAR_HALF-M) return true;   // 往左走且已越過車身左緣
+ return false;
+}
+function blocking(p){return onCrosswalk(p) && p.started && !clearedLane(p);}
+
+/* ---- 主更新 ---- */
+function update(dt){
+ if(scene!=='play'||!G)return;
+ if(G.over){
+  G.shake=Math.max(0,G.shake-dt*1.5);
+  if(G.crash)stepCrash(dt);
+  return;
+ }
+ G.t+=dt; G.left-=dt;
+ if(G.hornCool>0)G.hornCool-=dt;
+
+ // 車輛
+ var a=0;
+ if(G.gas)a+=G.accel;
+ if(G.brake)a-=G.brakePow;
+ a-=G.spd*0.055+ (G.spd>0?0.35:0);
+ G.spd=clamp(G.spd+a*dt,0,MAXSPD);
+ if(G.brake&&G.spd>4&&Math.random()<0.06)sfxSkid();
+ var prevFront=G.carZ+BUMPER;
+ G.carZ+=G.spd*dt;
+ var front=G.carZ+BUMPER;
+ G.bob+=dt*(2+G.spd*0.5);
+ if(G.shake>0)G.shake=Math.max(0,G.shake-dt*2.4);
+ if(G.rain)G.wiper+=dt*1.5;
+ engine(G.spd,G.gas);
+
+ // 轉向（僅右轉關卡）
+ if(G.steerLevel){
+  G.steer+=((G.steerInput)-G.steer)*Math.min(1,dt*8);
+  var latV=G.steer*clamp(G.spd,1.6,MAXSPD)*0.215;
+  G.carWX+=latV*dt;
+  // 彎道離心力：車被往彎外推，玩家要往彎內方向修正（右轉就要一直往右打）
+  var kap=curveKappaAt(G.carZ);
+  G.carWX-=kap*clamp(G.spd,0,MAXSPD)*2.0*dt;
+  var tp=0;
+  if(G.bends&&G.bends.length){var b0=G.bends[0];tp=clamp((G.carZ-b0.z)/b0.len,0,1);}
+  G.turnPhase=tp;
+  var lane=carLaneX(), edgeR=3.15, edgeL=-1.7;
+  var off=(lane>edgeR)||(lane<edgeL);
+  if(off){ G.offT+=dt;
+   if(G.offWarn<=0){ G.offWarn=1.5; toast(lane>edgeR?'快回車道！右邊是人行道':'快回車道！別開到對向','#e0574a'); }
+  } else { G.offT=Math.max(0,G.offT-dt*1.7); }
+  if(G.offWarn>0)G.offWarn-=dt;
+  if(G.offT>1.25){ return fail(lane>0?'curb':'oncoming',null); }
+ } else { G.carWX=CAR_X; }
+
+ // 行人
+ for(var i=0;i<G.peds.length;i++)updatePed(G.peds[i],dt,G);
+
+ // 阻擋狀態
+ G.blocked=false;
+ for(i=0;i<G.peds.length;i++){
+  var p=G.peds[i];
+  if(p.crossZ>G.carZ-4 && blocking(p)){G.blocked=true;break;}
+ }
+
+ // 停等時間 / 後車
+ if(G.spd<0.4){G.stopT+=dt;}else{G.stopT=0;}
+ updateTail(dt);
+
+ // 碰撞（判定寬度用較窄的 HIT_HALF；已走過我車道或車頭已開過其深度就不算撞）
+ var carX=carLaneX();
+ for(i=0;i<G.peds.length;i++){
+  var q=G.peds[i]; if(q.done||!q.started)continue;
+  if(clearedLane(q)||q.z<G.carZ-0.35)continue;
+  var overlapX=(q.x>carX-HIT_HALF-q.r)&&(q.x<carX+HIT_HALF+q.r);
+  if(!overlapX)continue;
+  var hitNow=(q.z>prevFront-0.15&&q.z<=front+0.15);
+  var inside=(q.z>=G.carZ-0.2&&q.z<=front);
+  if((hitNow&&G.spd>0.8)||(inside&&G.spd>1.6)){ return fail('crash',q); }
+ }
+ // 記錄行人上一幀橫向位置（供上面的方向性通過判定）
+ for(i=0;i<G.peds.length;i++)G.peds[i].lastX=G.peds[i].x;
+
+ // 路口判定
+ for(i=0;i<G.crosses.length;i++){
+  var c=G.crosses[i];
+  if(c.passed)continue;
+  var anyBlock=false;
+  for(var j=0;j<c.peds.length;j++){ if(blocking(c.peds[j])){anyBlock=true;break;} }
+  if(anyBlock&&G.spd<0.6&&front>c.stopZ-32&&front<c.stopZ+1){ c.wasBlocked=true; }
+  if(prevFront<=c.stopZ&&front>c.stopZ){
+   // 越過停止線的瞬間
+   if(c.light){
+    var ls=lightState(c,G.t);
+    if(ls.s==='r'){ return fail('red',null); }
+   }
+   // 未禮讓：先記下，不立刻失敗 —— 讓車繼續往前，真的撞到人就會飛出去（碰！）
+   if(anyBlock&&G.spd>0.7){ c.violated=true; }
+  }
+  if(front>c.z+2.5){
+   c.passed=true;
+   // 開過了斑馬線才結算：有撞到人早就 crash 了；沒撞到但硬闖 → 未禮讓
+   if(c.violated){ return fail('yield',null); }
+   if(c.wasBlocked){ G.yields++; G.score+=200; sfxOk(); toast('停讓成功 +200','#57c98a'); }
+  }
+ }
+
+ // 提示（第一關教學）
+ if(G.idx===0){
+  var d0=G.crosses[0].stopZ-front;
+  if(G.tut===0&&G.carZ>4){G.tut=1;toast('油門前進、煞車停；← → 可微調方向盤','#cfd6e0');}
+  if(G.tut===1&&d0<40){G.tut=2;toast('前方斑馬線有人，在白色停止線前停下來','#e0b23f');}
+ }
+
+ // 抵達
+ if(G.carZ>=G.L.goal){ return win(); }
+ if(G.left<=0){ return fail('time',null); }
+ if(G.left<10.5&&Math.floor(G.left)!==Math.floor(G.left+dt))sfxTick();
+
+ // toasts
+ for(i=G.toasts.length-1;i>=0;i--){G.toasts[i].t-=dt;if(G.toasts[i].t<=0)G.toasts.splice(i,1);}
+}
+
+var TAIL_BY={
+ granny:['是在等阿嬤膩，她走到你退休喔','阿嬤慢慢走，我幫你等到天荒地老','你家阿嬤喔，這麼有耐心','阿嬤走到對面天都亮了','扶阿嬤過馬路很偉大啦，但可以快點嗎'],
+ taichi:['他在打太極耶，等他得道膩','馬路中央練功，你也讓？','天人合一咧，喇叭都沒用','等他這招使完我孫子都生了','斑馬線上運氣，服了'],
+ phone:['低頭族啦，按他也沒感覺','他在看手機，你在看他','已讀不回還敢過馬路','手機比命重要是不是','等他滑完限動好嗎'],
+ dog:['等狗尿尿是不是','狗大爺散步，你跪著等','汪汪隊比你大牌喔','那隻狗聞到民國幾年了','牽繩的是他，被牽的是你'],
+ dropper:['他東西掉了關你屁事','讓他撿到天荒地老是不是','趕時間的到底是他還是你','他掉一次撿三次是在？','悠遊卡掉了世界要停下來喔'],
+ selfie:['網美在拍照啦，你也停？','等她修完圖天都黑了','斑馬線是攝影棚膩','再一張再一張，張你個頭','等她這張破十萬讚膩'],
+ kid:['一群小鬼牽手手，慢慢來喔','幼幼班過馬路，你乖乖等','數到第幾個了？','放學是放整個學校出來喔','一二一二，走到我退休'],
+ hesitate:['他自己都不知道要不要過','猶豫成這樣你也讓','走不走給個痛快好嗎','他在跟斑馬線談戀愛喔','要過不過，很會欸'],
+ uturn:['他又折回去了你看到沒','瓦斯到底關了沒啦','來來回回是在跳舞膩','走回去確認第五遍了','鑰匙那麼大支還會忘'],
+ gossip:['三姑六婆是聊不完的','馬路中央開講，經典','八卦講完再走是不是','那個八卦有這麼重要膩','邊走邊講很難嗎大姊'],
+ fridge:['搬冰箱要搬到民國幾年','一台冰箱比你的命重要膩','時速零點四，你也忍','抬高一點是要抬多久','冰箱都退冰了還沒過'],
+ drunk:['喝成這樣還敢走斑馬線','酒測的是他，等的是你','走S形是在跳恰恰膩','他走一步退半步，扯','醉的是他，塞的是我'],
+ normal:['一般人而已你也停這麼久','人家好好走，你在急三小','正常過個馬路都要等喔','走這麼慢是散步是不是','綠燈剩三秒他才要走'],
+ cat:['一隻貓欸，你也讓','喵星人過境，跪好','貓比你大牌啦','為一隻貓停車你聖人喔','牠坐下來了你看到沒'],
+ scooter:['逆向的還敢按你喔','外送大哥逆向欸，扯','那台不用等啦他趕時間','逆向仔最大聲，經典','他趕三分你賠一台'],
+ runner:['他在練馬拉松，不是要過馬路','跑那麼快結果卡在斑馬線','等他拉完筋膩','全馬跑者過個馬路要拉筋','他還差一圈啦你等等'],
+ chef:['他鍋子還在冒煙欸','等他甩完那鍋，飯都涼了','大廚過馬路也要鍋氣是不是','那鍋不是他的，是誰的','熱炒等等啦，先過人'],
+ tourist:['他地圖拿反了你看到沒','觀光客迷路，你陪他迷','導航叫他這裡迴轉膩','外地來的，多包涵一下…才怪','等他找到北，我都老了'],
+ balloon:['他氣球快飛走了，超急','一顆氣球擋住一台車，扯','抓氣球比過馬路重要膩','風在走他也在走','氣球飛了他還在追'],
+ rocker:['他在路口開演唱會膩','等他 solo 完好嗎','那段副歌有這麼長喔','街頭藝人也要讓喔…好啦','吉他背著過馬路很屌是不是'],
+ student:['書比人還高是要考狀元膩','邊走邊背書，走神了啦','學霸過馬路也在複習，服','那疊書掉下來要撿到明年','考卷重要還是命重要'],
+ painter:['他滿身顏料別碰到我的車','等他靈感來，你先塞著','他說我引擎蓋顏色不錯…謝謝喔','畫家過馬路也要取景膩','別擋他，他在醞釀大作'],
+ magician:['他帽子裡的兔子跑了啦','等他變完，奇蹟都退流行了','見證奇蹟你也要見證塞車','兔子回帽子要多久','魔術師最會拖時間'],
+ pineapple:['他扛一顆鳳梨擋整條路','買鳳梨送好運，送你塞車','那套裝很熱啦，快走','旺來旺來，你先過來好嗎','促銷促到斑馬線上了'],
+ astronaut:['他以為在月球慢慢飄','地球重力對他太強是不是','太空漫步走這麼慢','休士頓，這裡塞住了','登月都比他快'],
+ robot:['他當機了你看到沒','重新規劃路線要規劃多久','電量剩1%還敢過馬路','等他更新完，我車都舊了','機器人卡在斑馬線，經典'],
+ dancer:['斑馬線是他的舞台是不是','等他跳完這段，紅燈都綠了','走路也要節奏，服了','他在斑馬線上開趴喔','舞王過境，跪著等']
+};
+var TAIL_GENERIC=['是在等什麼啦大哥','綠燈了是沒在看喔','走了走了走了走了','你駕照網路買的膩','時間就是金錢欸','再不走我要下車了','阿你是在發呆膩','讓成這樣你聖人喔','後面塞一排了知不知道','是有沒有要開啊'];
+function tailLine(){
+ var best=null, bd=1e9;
+ for(var i=0;i<G.peds.length;i++){var p=G.peds[i];
+  if(!blocking(p))continue;
+  if(p.crossZ>G.carZ-4){var d=Math.abs(p.crossZ-G.carZ);if(d<bd){bd=d;best=p;}}
+ }
+ var pool=(best&&TAIL_BY[best.type])?TAIL_BY[best.type].concat(TAIL_GENERIC.slice(0,4)):TAIL_GENERIC;
+ if(!G.tailRecent)G.tailRecent=[];
+ var pick,tries=0;
+ do{pick=pool[Math.floor(Math.random()*pool.length)];tries++;}while(G.tailRecent.indexOf(pick)>=0&&tries<14);
+ G.tailRecent.push(pick); if(G.tailRecent.length>7)G.tailRecent.shift();
+ return pick;
+}
+// 車輛是否正對著紅（黃）燈路口→ 是的話屬合法停等，後車不該催
+function stoppedAtRed(){
+ if(!G.crosses)return false;
+ for(var i=0;i<G.crosses.length;i++){var c=G.crosses[i];
+  if(c.passed||!c.light)continue;
+  var d=c.z-G.carZ;                                   // 路口中心相對車的前方距離
+  if(d>-2 && d<42){                                   // 這個號誌就在你前方、還沒通過
+   var s=lightState(c,G.t).s;
+   if(s==='r'||s==='y')return true;
+  }
+ }
+ return false;
+}
+function updateTail(dt){
+ var T=G.tail;
+ var atRed=stoppedAtRed();                            // 紅燈合法停等：後車不催、也不逼車
+ var gap=G.carZ-T.z;
+ var want=(!atRed&&G.stopT>2.2)?(3.4-Math.min(0.8,G.stopT*0.06)):(7.5+G.spd*0.55);
+ var acc=(gap-want)*1.5-(T.spd-G.spd)*1.3;
+ T.spd=clamp(T.spd+acc*dt,0,MAXSPD*1.15);
+ T.z+=T.spd*dt;
+ if(G.carZ-T.z<2.5){T.z=G.carZ-2.5;T.spd=Math.min(T.spd,G.spd);}
+ if(T.honk>0)T.honk-=dt;
+ if(T.flash>0)T.flash-=dt;
+ if(T.mad>0)T.mad-=dt*0.10;
+ G.tailT-=dt;
+ if(atRed){ G.tailT=Math.max(G.tailT,1.2); T.honk=0; T.flash=0; } // 紅燈合法停等：後車安靜、不逼車
+ else if(G.stopT>3.2&&G.tailT<=0){
+  G.tailT=rnd(3.2,6.0)/(1+T.mad*0.5);
+  T.honk=0.75; T.flash=1.3; T.mad=Math.min(3,T.mad+0.5);
+  sfxHorn(); G.shake=Math.min(G.shake+0.32,1);
+  toast('後面的'+T.kind.n+'：'+tailLine(),'#e0b23f');
+ }
+ G.tailHonk=T.honk;
+}
+
+function toast(txt,col){ G.toasts.push({txt:txt,col:col||'#fff',t:2.6}); if(G.toasts.length>4)G.toasts.shift(); }
+
+var FAILMSG={
+ crash:['你撞到{n}了','駕照掰掰。這不是遊戲，喔不，這是遊戲，但還是掰掰。'],
+ red:['闖紅燈','紅燈是給你停的，不是給你參考的。'],
+ yield:['未禮讓行人','道交條例第 44 條，罰鍰 1200～6000 元，記違規點數。'],
+ time:['時間到','考官已經收走你的表格了。'],
+ curb:['開上人行道','右轉切太內側，輪子壓上騎樓。考官臉都綠了。'],
+ oncoming:['開到對向車道','右轉不是給你抄近路的，逆向很危險。']
+};
+var CRASH_CRY=['啊——','幹！','？？？','我的媽呀','哇啊啊啊'];
+function crashInto(q){
+ G.over=true; G.ok=false; G.shake=1; G.crash={t:0,ped:q,done:false};
+ sfxCrash(); engine(0,false);
+ var v=Math.max(G.spd,3.2);
+ q.rage=null; q.moving=false; q.anim='fly'; q.slow=0; q.fast=0;
+ q.y=0.35;
+ q.z=Math.max(q.z,G.carZ+BUMPER+0.3);
+ q.vy=5.4+v*0.60;                                   // 彈更高
+ q.vz=v*1.75+7.5;                                   // 飛更遠
+ q.vx=((q.x-carLaneX())>=0?1:-1)*rnd(0.6,2.4);
+ q.rot=0;
+ q.rotv=(q.vx>=0?1:-1)*rnd(9,18)*clamp(v/8,0.7,2.6); // 轉更多圈
+ q.bubble=CRASH_CRY[Math.floor(Math.random()*CRASH_CRY.length)]; q.bubbleT=1.6;
+ G.crashV=v; G.crash.ix=q.x; G.crash.iz=q.z; G.crash.iy=0.85;
+}
+function stepCrash(dt){
+ var C=G.crash, q=C.ped;
+ var slow=C.t<1.35?0.34:1;                          // 慢動作更久
+ var sdt=dt*slow;
+ C.t+=dt;
+ // 車輛煞停
+ G.spd=Math.max(0,G.spd-18*sdt); G.carZ+=G.spd*sdt; G.bob+=sdt*2;
+ // 行人飛行
+ if(q){
+  q.y+=q.vy*sdt; q.vy-=9.0*sdt;                      // 重力小一點 → 滯空更久
+  q.z+=q.vz*sdt; q.x+=q.vx*sdt;
+  q.rot+=q.rotv*sdt;
+  if(q.y<=0){
+   q.y=0;
+   if(q.vy<-1.2){ q.vy=-q.vy*0.52; q.vz*=0.62; q.vx*=0.6; q.rotv*=0.5; sfxBounce(); G.shake=Math.min(1,G.shake+0.34); }
+   else { q.vy=0; q.vz*=0.82; q.vx*=0.82; q.rotv*=0.62;
+    if(Math.abs(q.vz)<0.25){q.vz=0;q.vx=0;q.rotv=0;q.rot=(q.rot>0?1:-1)*1.5708;} }
+  }
+ }
+ if(!C.done&&C.t>2.7){
+  C.done=true;
+  // 撞到人一樣算「未禮讓行人」，撞飛只是效果
+  var m=FAILMSG.yield;
+  G.result={ok:false,title:m[0],
+   desc:'你把'+(q?q.T.name:'行人')+'撞飛了（時速 '+Math.round(G.crashV*3.6)+' 公里）。'+m[1],stars:0,score:0};
+  sfxFail();
+  setTimeout(function(){showResult();},420);
+ }
+}
+function fail(kind,ped){
+ if(kind==='crash')return crashInto(ped);
+ G.over=true;G.ok=false;G.shake=1;
+ sfxFail();
+ engine(0,false);
+ var m=FAILMSG[kind];
+ var title=m[0];
+ G.result={ok:false,title:title,desc:m[1],stars:0,score:0};
+ setTimeout(function(){showResult();},700);
+}
+function win(){
+ G.over=true;G.ok=true;sfxWin();engine(0,false);
+ var tRatio=G.left/G.L.time;
+ var stars=1;
+ if(tRatio>0.22)stars=2;
+ if(tRatio>0.38&&G.honks===0)stars=3;
+ var sc=G.score+Math.round(G.left*12)+G.yields*100-G.honks*80+600;
+ G.score=Math.max(0,sc);
+ var prev=save.stars[G.idx]||0;
+ if(stars>prev)save.stars[G.idx]=stars;
+ if(save.unlocked<G.idx+2)save.unlocked=Math.min(LEVELS.length,G.idx+2);
+ persist();
+ var desc='停讓 '+G.yields+' 次 · 按喇叭 '+G.honks+' 次 · 剩餘 '+Math.ceil(G.left)+' 秒';
+ G.result={ok:true,title:'抵達目的地',desc:desc,stars:stars,score:G.score};
+ setTimeout(function(){showResult();},650);
+}
+
+function honk(){
+ if(!G||G.over||G.hornCool>0)return;
+ G.hornCool=0.5; G.honks++; G.score-=40; sfxHorn(); G.shake=Math.min(1,G.shake+0.2);
+ G.tail.mad=Math.min(3,G.tail.mad+0.4);
+ var nF=0,nS=0,nR=0;
+ for(var i=0;i<G.peds.length;i++){
+  var p=G.peds[i];
+  if(p.done||!p.started)continue;
+  if(Math.abs(p.crossZ-G.carZ)>48||!onCrosswalk(p))continue;
+  var ahead=(p.crossZ>G.carZ+2);
+  if(p.rage){ p.rage.dur+=1.6; p.bubble='你還按！'; p.bubbleT=2.4; nR++; continue; }
+  var k=HONK_REACT[p.type]||'slow';
+  var lines=HONK_LINES[k];
+  p.bubble=lines[Math.floor(Math.random()*lines.length)]; p.bubbleT=2.6;
+  if(k==='fast'){ p.fast=3.6; p.slow=0; nF++; }
+  else if(k==='slow'){ p.slow=3.4; p.fast=0; nS++; }
+  else if(ahead){ p.rage={ph:'come',t:0,next:0.25,dur:rnd(3.2,4.6)}; p.slow=0; p.fast=0; nR++; G.rages++; }
+  else { p.slow=3.4; nS++; }
+ }
+ var msg;
+ if(nR) msg='他不走了，他朝你走過來了 -40';
+ else if(nS&&nF) msg='有人加快，有人故意更慢 -40';
+ else if(nS) msg='行人回頭瞪你，然後走更慢 -40';
+ else if(nF) msg='「好啦好啦」他走快了一點 -40';
+ else msg='喇叭很大聲，但沒有人在乎 -40';
+ toast(msg,nR?'#e0574a':(nF&&!nS?'#57c98a':'#e08a4a'));
+}
+
+/* ============ 7. 繪圖 ============ */
+function resize(){
+ var st=document.getElementById('stage');
+ var w=st.clientWidth,h=st.clientHeight;
+ DPR=Math.min(window.devicePixelRatio||1,2);
+ cv.width=Math.round(w*DPR);cv.height=Math.round(h*DPR);
+ cv.style.width=w+'px';cv.style.height=h+'px';
+ W=w;H=h;
+ g.setTransform(DPR,0,0,DPR,0,0);
+ FOCAL=Math.max(W,H*1.25)*0.62;
+ HZ=H*0.40;
+}
+
+function rr(x,y,w,h,r){g.beginPath();
+ if(g.roundRect){g.roundRect(x,y,w,h,r);return;}
+ r=Math.min(r,w/2,h/2);
+ g.moveTo(x+r,y);g.lineTo(x+w-r,y);g.quadraticCurveTo(x+w,y,x+w,y+r);
+ g.lineTo(x+w,y+h-r);g.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+ g.lineTo(x+r,y+h);g.quadraticCurveTo(x,y+h,x,y+h-r);
+ g.lineTo(x,y+r);g.quadraticCurveTo(x,y,x+r,y);g.closePath();}
+function quad(a,b,c,d){g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.lineTo(c.x,c.y);g.lineTo(d.x,d.y);g.closePath();}
+
+function skyCols(){
+ if(!G)return PAL.skyDay;
+ if(G.night)return PAL.skyNight;
+ if(G.rain)return PAL.skyRain;
+ if(G.L.sky==='dusk')return PAL.skyDusk;
+ return PAL.skyDay;
+}
+
+function draw(){
+ var sc=skyCols();
+ g.save();
+ var sh=G?G.shake:0;
+ if(sh>0)g.translate(rnd(-6,6)*sh,rnd(-4,4)*sh);
+ var bob=G?Math.sin(G.bob)*Math.min(G.spd,MAXSPD)*0.10:0;
+ g.translate(0,bob);
+
+ // 天空
+ var grd=g.createLinearGradient(0,-20,0,HZ+8);
+ grd.addColorStop(0,sc[0]);grd.addColorStop(0.65,sc[1]);grd.addColorStop(1,sc[2]);
+ g.fillStyle=grd;g.fillRect(-20,-40,W+40,HZ+42);
+ if(G&&G.night)drawStars();
+ if(G&&!G.night&&!G.rain&&G.L.sky!=='dusk')drawClouds();
+
+ // 遠景山/樓 剪影
+ drawSkyline(sc);
+
+ // 地面
+ g.fillStyle=G&&G.night?'#1a1e2a':(G&&G.rain?'#5a5f63':'#7d8a6a');
+ g.fillRect(-20,HZ,W+40,H-HZ+60);
+
+ drawRoad();
+ if(G){
+  drawSidewalks();
+  if(G.juncs)drawJunctions();
+  drawCrossings();
+  if(G.steerLevel&&G.bends){G.bends.forEach(function(b){drawTurnArrow(b.z-4,b.ang>0);});}
+  var items=[];
+  G.buildings.forEach(function(b){items.push({z:b.z+b.len,kind:'b',o:b});});
+  G.crosses.forEach(function(c,i){ if(c.light)items.push({z:c.z+1.5,kind:'l',o:c}); });
+  G.peds.forEach(function(p){ if(!p.done||Math.abs(p.x)<=SPAWN_X+1) items.push({z:p.z,kind:'p',o:p}); });
+  items.push({z:G.L.goal+2,kind:'goal',o:null});
+  G._labels=[];
+  items.sort(function(a,b){return b.z-a.z;});
+  items.forEach(function(it){
+   var dz=it.z-G.carZ;
+   if(dz<-6||dz>240)return;
+   if(it.kind==='b')drawBuilding(it.o);
+   else if(it.kind==='l')drawLight(it.o);
+   else if(it.kind==='p')drawPed(it.o);
+   else drawGoal();
+  });
+  drawPoles();
+  if(G.crash)drawImpact();
+  drawLabels();
+  drawBubbles();
+  if(G.night)drawNightFX();
+  if(G.L.sky==='dusk')drawDuskFX();
+  if(G.rain)drawRain();
+ }
+ g.restore();
+
+ if(G){ drawHood(); drawInterior(); drawHUDCanvas(); }
+}
+
+function drawStars(){
+ var r=mulberry(7);
+ g.fillStyle='rgba(255,255,255,.75)';
+ for(var i=0;i<70;i++){
+  var x=r()*W,y=r()*HZ*0.9,s=r()*1.4+0.3;
+  g.globalAlpha=0.3+r()*0.6;g.fillRect(x,y,s,s);
+ }
+ g.globalAlpha=1;
+ g.fillStyle='#f2eddc';g.beginPath();g.arc(W*0.78,HZ*0.24,H*0.035,0,6.3);g.fill();
+ g.fillStyle=sceneNightSkyTop();g.beginPath();g.arc(W*0.78+H*0.014,HZ*0.24-H*0.012,H*0.033,0,6.3);g.fill();
+}
+function sceneNightSkyTop(){return PAL.skyNight[0];}
+function drawClouds(){
+ var r=mulberry(21);
+ g.fillStyle='rgba(255,255,255,.55)';
+ for(var i=0;i<6;i++){
+  var x=(r()*W*1.4-(G?G.carZ*0.35:0))%(W*1.4)-W*0.2, y=HZ*(0.12+r()*0.45), s=H*(0.02+r()*0.035);
+  g.beginPath();g.ellipse(x,y,s*2.6,s,0,0,6.3);g.fill();
+  g.beginPath();g.ellipse(x+s*1.4,y-s*0.4,s*1.7,s*0.85,0,0,6.3);g.fill();
+ }
+}
+function drawSkyline(sc){
+ var off=G?(G.carZ*0.9)%80:0;
+ g.fillStyle=G&&G.night?'#0e1428':shade(sc[2],-0.30);
+ var r=mulberry(33);
+ for(var i=-1;i<26;i++){
+  var bw=W*0.075, x=i*bw-off*(W/500)-W*0.1, hh=(0.02+r()*0.075)*H;
+  g.fillRect(x,HZ-hh,bw*0.94,hh+3);
+ }
+}
+
+var JUNC_HW=6.8;                       // 路口沿里程的半長
+function inJunc(z){ if(!G||!G.juncs)return false; for(var i=0;i<G.juncs.length;i++){var d=z-G.juncs[i].z; if(d>-JUNC_HW&&d<JUNC_HW)return true;} return false; }
+// Project world geometry and clip at the camera plane, including during a turn.
+function worldPoly(points,col){
+ var cc=curveSample(G.carZ),sn=Math.sin(cc.phi),cs=Math.cos(cc.phi),lat=G.carWX-0.33;
+ var v=points.map(function(p){var dx=p[0]-cc.x-lat*cs,dz=p[1]-cc.z+lat*sn;return {x:dx*cs-dz*sn,z:dx*sn+dz*cs};}),out=[];
+ for(var i=0;i<v.length;i++){var p=v[i],q=v[(i+1)%v.length],ip=p.z>=0.5,iq=q.z>=0.5;if(ip)out.push(p);if(ip!==iq){var t=(0.5-p.z)/(q.z-p.z);out.push({x:lerp(p.x,q.x,t),z:0.5});}}
+ if(out.length<3)return;g.beginPath();out.forEach(function(p,i){var x=W/2+p.x*FOCAL/p.z,y=HZ+CAM_Y*FOCAL/p.z;if(i)g.lineTo(x,y);else g.moveTo(x,y);});g.closePath();g.fillStyle=col;g.fill();
+}
+function drawJunctions(){
+ var asphalt=G.night?shade(PAL.asphalt,-0.42):(G.rain?shade(PAL.asphalt,-0.30):PAL.asphalt);
+ G.juncs.forEach(function(j){
+  var b=j.bend;if(G.carZ>b.z+b.len+45||G.carZ<b.z-160)return;
+  var start=curveSample(b.z),end=curveSample(b.z+b.len),sn=Math.sin(start.phi),cs=Math.cos(start.phi);
+  var depth=(end.x-start.x)*sn+(end.z-start.z)*cs;
+  function rect(x0,z0,x1,z1,c){worldPoly([[x0,z0],[x1,z0],[x1,z1],[x0,z1]].map(function(p){return [start.x+p[0]*cs+p[1]*sn,start.z-p[0]*sn+p[1]*cs];}),c);}
+  var extent=65,half=ROAD_H;
+  rect(-half-2,-20,half+2,extent,PAL.walk);rect(-extent,depth-half-2,extent,depth+half+2,PAL.walk);
+  rect(-half,-20,half,extent,asphalt);rect(-extent,depth-half,extent,depth+half,asphalt);
+  // Open central paved area contains the full turning trajectory.
+  var turnX=(end.x-start.x)*cs-(end.z-start.z)*sn;
+  rect(Math.min(-half,turnX-half),-1,Math.max(half,turnX+half),depth+half,asphalt);
+  [-0.14,0.14].forEach(function(o){
+   rect(o-0.045,depth+half+5,o+0.045,extent,PAL.lineY);
+   rect(-extent,depth+o-0.045,-Math.abs(turnX)-half-5,depth+o+0.045,PAL.lineY);
+   rect(Math.abs(turnX)+half+5,depth+o-0.045,extent,depth+o+0.045,PAL.lineY);
+  });
+  // Crosswalks on the two unused arms; the driven arms use live crossings.
+  var unused=b.ang>0?-1:1;
+  for(var k=0;k<9;k++){
+   var u=-half+0.25+k*0.73;
+   rect(u,depth+half+1,u+0.40,depth+half+3.5,PAL.line);
+   var x=unused*(Math.abs(turnX)+half+2);
+   rect(x-1.25,depth+u,x+1.25,depth+u+0.4,PAL.line);
+  }
+ });
+}
+function roadStripe(lat,wl,col){       // 沿道路分段畫一條標線（會跟著彎）
+ var nz=0.7, farZ=205, segs=44, prev=null;
+ g.fillStyle=col;
+ for(var i=0;i<=segs;i++){
+  var f=i/segs, z=nz+(farZ-nz)*f*f;
+  var c=project(lat,0.012,z), w=Math.max(0.5,wl*c.s);
+  var p={x:c.x,y:c.y,w:w};
+  if(prev){g.beginPath();g.moveTo(prev.x-prev.w,prev.y);g.lineTo(prev.x+prev.w,prev.y);g.lineTo(p.x+p.w,p.y);g.lineTo(p.x-p.w,p.y);g.closePath();g.fill();}
+  prev=p;
+ }
+}
+function drawRoad(){
+ var farZ=230, nz=0.6;
+ if(!G){
+  var a=project(-ROAD_H,0,farZ),b=project(ROAD_H,0,farZ),c=project(ROAD_H,0,nz),d=project(-ROAD_H,0,nz);
+  quad(a,b,c,d); g.fillStyle=PAL.asphalt; g.fill(); return;
+ }
+ var night=G.night, rain=G.rain;
+ var base=night?shade(PAL.asphalt,-0.42):(rain?shade(PAL.asphalt,-0.30):PAL.asphalt);
+ // 分段畫路面（沿彎道）
+ var segs=46, prev=null;
+ for(var i=0;i<=segs;i++){
+  var f=i/segs, z=nz+(farZ-nz)*f*f;
+  var Lp=project(-ROAD_H,0,z), Rp=project(ROAD_H,0,z);
+  if(prev){ quad(prev.L,prev.R,Rp,Lp); g.fillStyle=shade(base,-0.06*(1-f)); g.fill(); }
+  prev={L:Lp,R:Rp};
+ }
+ // 中央雙黃線 + 兩側邊線（分段沿彎）
+ var yc=night?shade(PAL.lineY,-0.3):PAL.lineY, lc=night?shade(PAL.line,-0.35):PAL.line;
+ roadStripe(-0.16,0.12,yc); roadStripe(0.16,0.12,yc);
+ roadStripe(-(ROAD_H-0.18),0.09,lc); roadStripe(ROAD_H-0.18,0.09,lc);
+ // 距離感：路面橫向紋理
+ var bz=Math.floor(G.carZ/6)*6;
+ for(var k=0;k<40;k++){
+  var z0=bz+k*6-G.carZ;
+  if(z0<0.8||z0>farZ)continue;
+  var q1=project(-ROAD_H,0,z0),q2=project(ROAD_H,0,z0);
+  g.globalAlpha=clamp(0.06*(1-z0/farZ),0,0.06);
+  g.strokeStyle='#000';g.lineWidth=Math.max(0.5,q1.s*0.03);
+  g.beginPath();g.moveTo(q1.x,q1.y);g.lineTo(q2.x,q2.y);g.stroke();
+ }
+ g.globalAlpha=1;
+}
+
+function drawSidewalks(){
+ var farZ=210,nz=0.6,hgt=0.16,segs=42;
+ [-1,1].forEach(function(sd){
+  var x0=sd*ROAD_H,x1=sd*WALK_X;
+  var sideCol=G.night?shade(PAL.curb,-0.5):shade(PAL.curb,-0.22);
+  var topCol=G.night?shade(PAL.walk,-0.48):PAL.walk;
+  var prev=null;
+  for(var i=0;i<=segs;i++){
+   var f=i/segs, z=nz+(farZ-nz)*f*f;
+   if(inJunc(G.carZ+z)){prev=null;continue;}          // 路口處人行道斷開
+   var top=project(x0,hgt,z), bot=project(x0,0,z), inr=project(x1,hgt,z);
+   if(prev){
+    quad(prev.top,prev.bot,bot,top); g.fillStyle=sideCol; g.fill();      // 路緣側面
+    quad(prev.top,prev.inr,inr,top); g.fillStyle=topCol; g.fill();       // 人行道上面
+   }
+   prev={top:top,bot:bot,inr:inr};
+  }
+  // 磚縫
+  var base=Math.floor(G.carZ/2.5)*2.5;
+  g.strokeStyle=G.night?'rgba(255,255,255,.05)':'rgba(0,0,0,.10)';
+  for(var k=0;k<50;k++){
+   var z0=base+k*2.5-G.carZ;
+   if(z0<0.8||z0>110)continue;
+   if(inJunc(G.carZ+z0))continue;
+   var p1=project(x0,hgt,z0),p2=project(x1,hgt,z0);
+   g.lineWidth=Math.max(0.4,p1.s*0.012);
+   g.beginPath();g.moveTo(p1.x,p1.y);g.lineTo(p2.x,p2.y);g.stroke();
+  }
+ });
+}
+
+function drawCrossings(){
+ G.crosses.forEach(function(c){
+  var dz=c.z-G.carZ;
+  if(dz<-8||dz>150)return;
+  var anyBlock=false;
+  for(var j=0;j<c.peds.length;j++){if(blocking(c.peds[j])){anyBlock=true;break;}}
+  // 斑馬線
+  var z0=c.z-2.0,z1=c.z+2.0;
+  g.fillStyle=G.night?shade(PAL.line,-0.3):PAL.line;
+  for(var i=0;i<9;i++){
+   var xa=-ROAD_H+0.25+i*((ROAD_H*2-0.5)/9)+0.06;
+   var xb=xa+((ROAD_H*2-0.5)/9)*0.55;
+   var A=project(xa,0.012,z1-G.carZ),B=project(xb,0.012,z1-G.carZ),
+       Cq=project(xb,0.012,z0-G.carZ),D=project(xa,0.012,z0-G.carZ);
+   if(z0-G.carZ<0.5)continue;
+   quad(A,B,Cq,D);g.fill();
+  }
+  // 停止線
+  var sz=c.stopZ-G.carZ;
+  if(sz>0.5){
+   var s1=project(0.05,0.012,sz),s2=project(ROAD_H-0.1,0.012,sz),
+       s3=project(ROAD_H-0.1,0.012,sz+0.42),s4=project(0.05,0.012,sz+0.42);
+   quad(s1,s2,s3,s4);
+   g.fillStyle=G.night?shade(PAL.line,-0.25):PAL.line;g.fill();
+   if(anyBlock&&!c.passed){
+    quad(s1,s2,s3,s4);
+    g.globalAlpha=0.30+Math.sin(G.t*6)*0.16;
+    g.fillStyle='#d94b3d';g.fill();
+    g.globalAlpha=1;
+   }
+  }
+ });
+}
+
+function drawBuilding(b){
+ var zn=b.z-G.carZ, zf=b.z+b.len-G.carZ;
+ if(zf<0.8)return;
+ if(G.juncs){for(var _j=0;_j<G.juncs.length;_j++){var jz=G.juncs[_j].z; if(b.z+b.len>jz-JUNC_HW-1&&b.z<jz+JUNC_HW+1)return;}}
+ var xw=b.side*WALK_X, xo=b.side*(WALK_X+9);
+ var lit=G.night;
+ // 側牆
+ var a=project(xw,b.h,Math.max(zn,0.8)),bb=project(xw,0,Math.max(zn,0.8)),
+     c=project(xw,0,Math.min(zf,230)),d=project(xw,b.h,Math.min(zf,230));
+ quad(a,bb,c,d);
+ g.fillStyle=lit?shade(b.col,-0.55):shade(b.col,-0.14);
+ g.fill();
+ // 騎樓（一樓內縮的暗帶）
+ var ga=project(xw,3.0,Math.max(zn,0.8)),gb=project(xw,0,Math.max(zn,0.8)),
+     gc=project(xw,0,Math.min(zf,230)),gd=project(xw,3.0,Math.min(zf,230));
+ quad(ga,gb,gc,gd);
+ g.fillStyle=lit?'#12151d':shade(b.col,-0.46);g.fill();
+ // 鐵捲門
+ var mz0=b.z+b.len*0.22, mz1=b.z+b.len*0.72;
+ if(mz1-G.carZ>1){
+  var m1=project(xw,2.5,Math.max(mz0-G.carZ,0.9)),m2=project(xw,0.15,Math.max(mz0-G.carZ,0.9)),
+      m3=project(xw,0.15,Math.min(mz1-G.carZ,230)),m4=project(xw,2.5,Math.min(mz1-G.carZ,230));
+  quad(m1,m2,m3,m4);g.fillStyle=lit?shade(b.shutter,-0.55):shade(b.shutter,-0.20);g.fill();
+ }
+ // 窗
+ var rows=b.floors, r=mulberry(Math.floor(b.z*13+b.side*7));
+ if(zn<95)for(var fl=1;fl<rows;fl++){
+  var yy=0.9+fl*(b.h/rows);
+  for(var k=0;k<Math.max(1,Math.floor(b.len/2.2));k++){
+   var wz=b.z+0.9+k*2.2, on=r()<0.45;
+   if(wz-G.carZ<1)continue;
+   var p1=project(xw,yy+0.75,wz-G.carZ),p2=project(xw,yy,wz+1.2-G.carZ);
+   var x1=Math.min(p1.x,p2.x),x2=Math.max(p1.x,p2.x);
+   g.fillStyle=lit?(on?'rgba(255,214,140,.85)':'rgba(30,36,56,.9)'):'rgba(40,48,62,.42)';
+   g.fillRect(x1,p1.y,Math.max(1,x2-x1),Math.max(1,p2.y-p1.y));
+  }
+ }
+ // 正面（近端）
+ if(zn>0.8){
+  var f1=project(xw,b.h,zn),f2=project(xo,b.h,zn),f3=project(xo,0,zn),f4=project(xw,0,zn);
+  quad(f1,f2,f3,f4);g.fillStyle=lit?shade(b.col,-0.42):shade(b.col,0.10);g.fill();
+ }
+ // 直立招牌
+ if(b.hasSign&&zn>2){
+  var sz=b.z+1.4-G.carZ;
+  if(sz<9)return;
+  var top=Math.min(b.h-0.4,4.6), bot=top-2.4;
+  var sxA=b.side*(WALK_X-0.15), sxB=b.side*(WALK_X-1.15);
+  var q1=project(sxA,top,sz),q2=project(sxB,top,sz),q3=project(sxB,bot,sz),q4=project(sxA,bot,sz);
+  quad(q1,q2,q3,q4);
+  g.fillStyle=lit?shade(b.signCol,0.18):b.signCol;g.fill();
+  g.strokeStyle=shade(b.signCol,-0.3);g.lineWidth=Math.max(0.5,q1.s*0.02);g.stroke();
+  var hpx=Math.abs(q4.y-q1.y);
+  if(hpx>H*0.78)return;
+  if(hpx>18){
+   var chars=b.sign.split('').slice(0,5);
+   var fs=Math.min(hpx/chars.length*0.86,Math.abs(q2.x-q1.x)*0.8);
+   g.fillStyle='#fff8ea';g.font='700 '+fs.toFixed(1)+'px "Noto Sans TC",sans-serif';
+   g.textAlign='center';g.textBaseline='top';
+   var cx=(q1.x+q2.x)/2;
+   for(var ci=0;ci<chars.length;ci++){
+    g.fillText(chars[ci],cx,q1.y+ci*(hpx/chars.length)+hpx*0.04);
+   }
+   g.textAlign='left';g.textBaseline='alphabetic';
+  }
+ }
+}
+
+function drawPoles(){
+ var span=26, base=Math.floor((G.carZ-span)/span)*span;
+ var pts=[[],[]];
+ for(var k=0;k<11;k++){
+  var pz=base+k*span, dz=pz-G.carZ;
+  if(dz<1.2||dz>200)continue;
+  [-1,1].forEach(function(sd,si){
+   var px=sd*5.72;
+   var bt=project(px,0.16,dz), tp=project(px,7.6,dz);
+   var w=Math.max(1.2,bt.s*0.15);
+   g.fillStyle=G.night?'#14181f':(G.rain?'#5c6165':'#7d786f');
+   g.fillRect(bt.x-w/2,tp.y,w,bt.y-tp.y);
+   // 橫擔
+   var ax=project(px-sd*0.7,6.9,dz);
+   g.fillRect(Math.min(ax.x,tp.x),tp.y+(bt.y-tp.y)*0.09,Math.abs(ax.x-tp.x),Math.max(1,w*0.8));
+   pts[si].push({x:tp.x,y:tp.y+(bt.y-tp.y)*0.06,s:bt.s});
+  });
+ }
+ g.strokeStyle=G.night?'rgba(10,12,18,.9)':'rgba(40,44,52,.55)';
+ for(var si=0;si<2;si++){
+  for(var i=0;i<pts[si].length-1;i++){
+   var a=pts[si][i],b2=pts[si][i+1];
+   for(var o=0;o<3;o++){
+    g.lineWidth=Math.max(0.6,Math.min(a.s,b2.s)*0.012);
+    g.beginPath();g.moveTo(a.x,a.y+o*a.s*0.06);
+    g.quadraticCurveTo((a.x+b2.x)/2,(a.y+b2.y)/2+Math.min(a.s,b2.s)*0.30+o*a.s*0.05,b2.x,b2.y+o*b2.s*0.06);
+    g.stroke();
+   }
+  }
+ }
+}
+
+
+function drawPedSignal(c){
+ var dz=c.z-G.carZ;if(dz<0.8||dz>110)return;var st=pedLightState(c,G.t);
+ [-1,1].forEach(function(side){
+  var p=project(side*(ROAD_H+0.72),2.45,dz),base=project(side*(ROAD_H+0.72),0,dz),u=p.s;
+  g.save();g.strokeStyle='#596772';g.lineWidth=Math.max(1,u*0.075);g.beginPath();g.moveTo(p.x,p.y);g.lineTo(base.x,base.y);g.stroke();
+  var w=Math.max(9,u*0.60),h=w*1.78;
+  g.fillStyle='#151f27';rr(p.x-w/2,p.y-h,w,h,w*0.10);g.fill();g.strokeStyle='#8c9c9d';g.lineWidth=Math.max(0.5,w*0.025);g.stroke();
+  var on=st.s==='g',col=on?'#59ef9a':'#fa6865',cx=p.x,cy=p.y-h*0.68;
+  var phase=on?Math.sin(G.t*(st.flash?16:7))*w*0.14:0;
+  g.strokeStyle=col;g.fillStyle=col;g.lineCap='round';g.lineWidth=w*0.07;
+  if(!st.flash||Math.sin(G.t*12)>-0.5){
+   g.beginPath();g.arc(cx,cy-w*0.17,w*0.078,0,Math.PI*2);g.fill();
+   g.beginPath();g.moveTo(cx,cy-w*0.04);g.lineTo(cx,cy+w*0.22);g.moveTo(cx,cy+w*0.05);g.lineTo(cx-w*0.14-phase,cy+w*0.20);g.moveTo(cx,cy+w*0.05);g.lineTo(cx+w*0.14+phase,cy+w*0.18);g.moveTo(cx,cy+w*0.22);g.lineTo(cx-w*0.13-phase,cy+w*0.47);g.moveTo(cx,cy+w*0.22);g.lineTo(cx+w*0.13+phase,cy+w*0.47);g.stroke();
+  }
+  g.font='bold '+(w*0.46)+'px monospace';g.textAlign='center';g.textBaseline='middle';g.fillText(String(Math.ceil(st.left)).padStart(2,'0'),cx,p.y-w*0.30);g.restore();
+ });
+}
+
+function drawLight(c){
+ if(c.pedSignal)drawPedSignal(c);
+ var dz=c.z-G.carZ+1.2;
+ if(dz<1)return;
+ var st=lightState(c,G.t);
+ var px=ROAD_H+0.5;
+ var base=project(px,0,dz), top=project(px,5.2,dz);
+ var wpx=Math.max(1.2,base.s*0.13);
+ g.fillStyle=G.night?'#2a2f38':'#5d636c';
+ g.fillRect(base.x-wpx/2,top.y,wpx,base.y-top.y);
+ // 橫桿
+ var arm=project(1.2,5.2,dz);
+ g.fillRect(Math.min(arm.x,top.x),top.y-wpx*0.6,Math.abs(arm.x-top.x),wpx*0.9);
+ // 燈箱
+ var lb=project(1.0,4.55,dz);
+ var bw=Math.max(6,lb.s*0.42),bh=bw*2.5;
+ g.fillStyle='#1d2128';rr(lb.x-bw/2,lb.y-bh*0.5,bw,bh,bw*0.18);g.fill();
+ var cols=[['#ff5a4a','r'],['#f5c33c','y'],['#4fd58a','g']];
+ for(var i=0;i<3;i++){
+  var on=st.s===cols[i][1];
+  g.fillStyle=on?cols[i][0]:shade(cols[i][0],-0.62);
+  g.beginPath();g.arc(lb.x,lb.y-bh*0.5+bh*(0.2+i*0.3),bw*0.28,0,6.3);g.fill();
+  if(on){g.globalAlpha=0.28;g.beginPath();g.arc(lb.x,lb.y-bh*0.5+bh*(0.2+i*0.3),bw*0.7,0,6.3);g.fill();g.globalAlpha=1;}
+ }
+ // 秒數
+ if(bw>13&&st){
+  g.fillStyle=st.s==='r'?'#ff8a7a':(st.s==='y'?'#f5c33c':'#7ff0b0');
+  g.font='700 '+(bw*0.62).toFixed(1)+'px "Noto Sans TC",sans-serif';g.textAlign='center';
+  g.fillText(String(Math.ceil(st.left)),lb.x,lb.y-bh*0.5-bw*0.22);
+  g.textAlign='left';
+ }
+}
+
+/* ---- 行人繪製 ---- */
+function drawPed(p){
+ var dz=p.z-G.carZ;
+ if(dz<0.6||dz>190)return;
+ var py=p.y||0;
+ var gd=project(p.x,0,dz);
+ var pr=project(p.x,py,dz), s=pr.s, hpx=p.h*s;
+ if(hpx<2.5||hpx>H*1.6)return;
+ var T=p.T;
+ g.save();
+ // 影子（離地越高越淡越小）
+ var sf=clamp(1-py*0.30,0.28,1);
+ g.globalAlpha=sf*(G.night?0.5:0.28);
+ g.fillStyle='#000';
+ g.beginPath();g.ellipse(gd.x,gd.y,hpx*0.17*sf,hpx*0.05*sf,0,0,6.3);g.fill();
+ g.globalAlpha=1;
+ if(p.rot){var px0=pr.x,py0=pr.y-hpx*0.45;g.translate(px0,py0);g.rotate(p.rot);g.translate(-px0,-py0);}
+
+ if(p.type==='cat'){drawCat(pr.x,pr.y,hpx,p);g.restore();return;}
+ if(p.type==='scooter'){drawScooter(pr.x,pr.y,hpx,p);g.restore();return;}
+
+ var light=G.night?-0.16:0, skin=shade(T.skin,light);
+ var headY=pr.y-hpx*0.925, shY=pr.y-hpx*0.79;
+ drawHuman(pr.x,pr.y,hpx,p);
+ if(p.type==='fridge'){
+  drawHuman(pr.x+hpx*0.62,pr.y,hpx,p);
+  var fx=pr.x+hpx*0.31;
+  var metal=g.createLinearGradient(fx-hpx*0.22,0,fx+hpx*0.22,0);
+  metal.addColorStop(0,'#a6b0b8');metal.addColorStop(0.25,'#f2f0e8');metal.addColorStop(1,'#bcc4c7');
+  g.fillStyle=metal;rr(fx-hpx*0.22,pr.y-hpx*0.74,hpx*0.44,hpx*0.59,hpx*0.02);g.fill();
+  g.strokeStyle='#7f8c94';g.lineWidth=hpx*0.009;g.stroke();
+  g.fillStyle='#89979e';g.fillRect(fx-hpx*0.22,pr.y-hpx*0.52,hpx*0.44,hpx*0.008);
+  g.fillRect(fx+hpx*0.13,pr.y-hpx*0.68,hpx*0.016,hpx*0.11);g.fillRect(fx+hpx*0.13,pr.y-hpx*0.46,hpx*0.016,hpx*0.18);
+ }
+ if(p.anim==='sniff'||p.type==='dog'){
+  var dx=pr.x-p.dir*hpx*0.42;
+  g.fillStyle=shade('#c69a63',light);
+  rr(dx-hpx*0.13,pr.y-hpx*0.22,hpx*0.26,hpx*0.13,hpx*0.05);g.fill();
+  g.beginPath();g.arc(dx-p.dir*hpx*0.14,pr.y-hpx*0.24,hpx*0.075,0,6.3);g.fill();
+  g.strokeStyle=shade('#c69a63',light-0.1);g.lineWidth=Math.max(1,hpx*0.03);
+  g.beginPath();g.moveTo(dx-hpx*0.08,pr.y-hpx*0.11);g.lineTo(dx-hpx*0.08,pr.y);g.stroke();
+  g.beginPath();g.moveTo(dx+hpx*0.09,pr.y-hpx*0.11);g.lineTo(dx+hpx*0.09,pr.y);g.stroke();
+  g.strokeStyle='rgba(230,225,215,.55)';g.lineWidth=Math.max(0.6,hpx*0.012);
+  g.beginPath();g.moveTo(pr.x-hpx*0.12,shY+hpx*0.2);g.lineTo(dx,pr.y-hpx*0.24);g.stroke();
+ }
+ if(p.anim==='drop'||p.anim==='pick'){
+  var ix=pr.x-p.dir*hpx*0.30;
+  g.fillStyle='#e8c24a';g.fillRect(ix-hpx*0.05,pr.y-hpx*0.05,hpx*0.10,hpx*0.05);
+ }
+ if(G.rain){
+  g.fillStyle=shade(['#d95c5c','#4a7fc0','#3d3d46','#d9a13d'][Math.abs(Math.floor(p.z))%4],light);
+  g.beginPath();g.ellipse(pr.x,headY-hpx*0.20,hpx*0.30,hpx*0.13,0,3.14,6.28);g.fill();
+  g.strokeStyle='#4a4a52';g.lineWidth=Math.max(0.8,hpx*0.014);
+  g.beginPath();g.moveTo(pr.x,headY-hpx*0.20);g.lineTo(pr.x,headY+hpx*0.02);g.stroke();
+ }
+ if(dz<46&&hpx>28&&!p.rot&&hpx<H*0.8)G._labels.push({txt:T.name,x:pr.x,y:pr.y-hpx*(1.08+(T.topExtra||0)),dz:dz,fs:Math.max(10,Math.min(15,hpx*0.10))});
+ g.restore();
+}
+
+
+// Art uses normalized anatomical joints: adult ~7 heads, child ~5.5 heads.
+// Tapered limbs, overlapping silhouettes and directional faces replace stick figures.
+function drawHuman(x,y,h,p){
+ var T=p.T,child=p.type==='kid',elder=p.type==='granny'||p.type==='taichi',female=p.type==='selfie'||p.type==='gossip'||p.type==='granny';
+ var moving=p.moving,phase=p.phase||0,run=p.anim==='run',a=p.anim||'',dir=p.dir||1;
+ var bounce=moving?Math.abs(Math.sin(phase))*(a==='moonwalk'?0.043:a==='dance'?0.027:0.009):0;
+ var skin=shade(T.skin,G.night?-0.15:0),cloth=shade(T.cloth,G.night?-0.12:0),pants=shade(T.pants,G.night?-0.12:0);
+ var hip=0.49,shoulder=child?0.76:0.80,head=child?0.905:0.928,hr=child?0.091:0.069;
+ var lean=(elder?0.018:0)+(run?0.045:0)+(a==='phone'?0.025:0);
+ var crouch=a==='pick'||a==='drop'?0.14:0;
+ var width=T.width||(child?0.090:(female?0.105:0.118));
+ g.save();g.translate(x,y);g.scale(h*dir,h);g.lineCap='round';g.lineJoin='round';
+ function ellipse(x,y,rx,ry,c){g.fillStyle=c;g.beginPath();g.ellipse(x,-y,rx,ry,0,0,Math.PI*2);g.fill();}
+ function line(points,c,w){g.strokeStyle=c;g.lineWidth=w;g.beginPath();points.forEach(function(v,i){if(i)g.lineTo(v[0],-v[1]);else g.moveTo(v[0],-v[1]);});g.stroke();}
+ function poly(points,c){g.fillStyle=c;g.beginPath();points.forEach(function(v,i){if(i)g.lineTo(v[0],-v[1]);else g.moveTo(v[0],-v[1]);});g.closePath();g.fill();}
+ function limb(A,B,ra,rb,c){var dx=B[0]-A[0],dy=B[1]-A[1],d=Math.hypot(dx,dy)||1,nx=-dy/d,ny=dx/d;
+  poly([[A[0]+nx*ra,A[1]+ny*ra],[B[0]+nx*rb,B[1]+ny*rb],[B[0]-nx*rb,B[1]-ny*rb],[A[0]-nx*ra,A[1]-ny*ra]],c);ellipse(A[0],A[1],ra,ra,c);ellipse(B[0],B[1],rb,rb,c);
+ }
+ function leg(back){
+  var cycle=phase+(back?Math.PI:0),stride=moving?Math.sin(cycle)*(run?0.19:0.105):0;
+  var lift=moving?Math.max(0,Math.cos(cycle))* (run?0.11:0.042):0;
+  var hx=back?-0.033:0.036, foot=hx+stride, knee=hx+stride*0.4+0.022;
+  if(a==='taichi'){foot=back?-0.16:0.18;knee=foot*0.6;}
+  if(a==='stretch'){foot=back?-0.16:0.10;lift=back?0:0.09;}
+  if(a==='dance'){foot+=Math.sin(G.t*7+(back?2:0))*0.06;}
+  if(a==='robot'){knee=hx;lift=Math.round(lift*30)/30;}
+  if(a==='fly'){foot=back?-0.24:0.21;lift=back?0.15:0.05;}
+  var c=shade(pants,back?-0.24:0.02);
+  limb([hx,hip-crouch*0.3],[knee,0.265+lift*0.4],0.046,0.031,c);
+  limb([knee,0.265+lift*0.4],[foot,0.045+lift],0.032,0.023,c);
+  line([[knee-0.007,0.24+lift*0.4],[foot-0.007,0.08+lift]],shade(c,0.18),0.006);
+  // Heel, instep, toe and contrasting sole.
+  ellipse(foot+0.018,0.026+lift,0.051,0.026,'#252a35');
+  line([[foot-0.025,0.01+lift],[foot+0.061,0.01+lift]],'#c6c8c9',0.009);
+  line([[foot+0.005,0.040+lift],[foot+0.031,0.033+lift]],'#828c97',0.008);
+ }
+ leg(true);leg(false);
+ g.translate(lean,-bounce+crouch);
+ var sh=shoulder, leftHand,rightHand;
+ function arm(back){
+  var side=back?-1:1,sw=moving?Math.sin(phase+(back?0:Math.PI))*0.09:0;
+  var A=[side*width*0.75,sh-0.025],B=[side*(width+0.015)+sw*0.5,sh-0.14],C=[side*(width+0.006)+sw,sh-0.265];
+  if(['cook','map','guitar','books'].indexOf(a)>=0){B=[side*0.13,sh-0.17];C=[side*0.12+0.07,sh-0.14];}
+  if(a==='balloon'&&!back){B=[0.18,sh+0.04];C=[0.20,sh+0.14];}
+  if(['paint','magic','wave','dance'].indexOf(a)>=0&&!back){B=[0.19,sh+0.02];C=[0.24,sh+0.12+Math.sin(G.t*4)*0.045];}
+  if(a==='stretch'&&!back){B=[0.13,sh+0.09];C=[-0.07,sh+0.08];}
+  if(a==='robot'){B=[side*0.16,sh-0.12];C=[side*0.16,sh-0.22];}
+  if(a==='phone'){B=[side*0.115,sh-0.16];C=[0.12+side*0.021,sh-0.12];}
+  if(a==='selfie'&&!back){B=[0.20,sh+0.055];C=[0.27,sh+0.18];}
+  if(a==='think'&&!back){B=[0.15,sh-0.12];C=[0.08,sh+0.045];}
+  if(a==='taichi'){B=[side*0.20,sh-0.03];C=[side*0.29,sh+(back?-0.04:0.055)+Math.sin(G.t*1.8)*0.025];}
+  if(a==='carry'){B=[side*0.17,sh-0.16];C=[side*0.22,sh-0.13];}
+  if(a==='bang'||a==='fly'){B=[side*0.19,sh+0.02];C=[side*0.25,sh+0.14+(a==='bang'?Math.sin(G.t*13+side)*0.045:0)];}
+  if(a==='pick'||a==='drop'){B=[side*0.12,sh-0.20];C=[side*0.10+0.07,sh-0.35];}
+  var c=shade(cloth,back?-0.25:-0.02);
+  limb(A,B,0.031,0.025,c);limb(B,C,0.023,0.014,shade(skin,back?-0.16:0));
+  ellipse(C[0],C[1]-0.008,0.020,0.029,skin);ellipse(C[0]-0.018,C[1],0.009,0.017,skin);
+  if(back)leftHand=C;else rightHand=C;
+ }
+ arm(true);
+ if(p.type==='normal'||child||p.type==='uturn'){
+  ellipse(-width,sh-0.13,0.058,0.13,child?'#d66d3e':'#72594c');
+  line([[-width-0.025,sh-0.065],[-width-0.03,sh-0.19]],'#c59b74',0.009);
+ }
+ // Rounded shoulders, chest, waist and shirt hem.
+ var fabric=g.createLinearGradient(-width,0,width,0);fabric.addColorStop(0,shade(cloth,-0.18));fabric.addColorStop(0.38,shade(cloth,0.18));fabric.addColorStop(1,shade(cloth,-0.06));
+ g.fillStyle=fabric;g.beginPath();g.moveTo(-0.076,-hip);g.lineTo(-width,-(sh-0.045));g.quadraticCurveTo(-width,-sh,-0.035,-(sh+0.017));g.lineTo(0.035,-(sh+0.017));g.quadraticCurveTo(width,-sh,width,-(sh-0.045));g.lineTo(0.080,-hip);g.quadraticCurveTo(0,-(hip-0.018),-0.076,-hip);g.fill();
+ line([[-0.074,hip+0.008],[0.075,hip+0.008]],shade(cloth,-0.28),0.010);
+ line([[-0.065,hip+0.10],[-0.017,hip+0.085]],shade(cloth,-0.15),0.007);
+ limb([0,sh+0.01],[0.008,head-hr*0.83],0.027,0.023,shade(skin,-0.12));
+ poly([[-0.043,sh+0.02],[0,sh-0.035],[0.045,sh+0.02],[0.027,sh-0.047],[0,sh-0.023],[-0.025,sh-0.049]],shade(cloth,0.35));
+ if(p.type==='dropper'){poly([[0,sh-0.025],[-0.020,sh-0.15],[0.002,sh-0.183],[0.021,sh-0.15]],'#994957');}
+ if(elder){for(var button=0;button<4;button++)ellipse(0.012,sh-0.085-button*0.047,0.005,0.005,'#d5d1c5');}
+ if(p.type==='gossip'||p.type==='granny')for(var f=0;f<7;f++){var px=(f%3-1)*0.050,py=sh-0.09-Math.floor(f/3)*0.075;ellipse(px,py,0.014,0.008,'#e9b7b7');ellipse(px,py,0.005,0.005,'#f6d99d');}
+ if(child){poly([[-0.035,sh-0.09],[0.005,sh-0.09],[0.04,sh-0.14],[-0.03,sh-0.16]],'#f2f2e2');line([[-0.012,sh-0.11],[0.018,sh-0.14]],'#4d80ab',0.012);}
+ // Hair behind the head: long hair and ponytail have separate silhouettes.
+ if(p.type==='selfie'){ellipse(-0.026,head-0.04,hr*0.92,hr*1.40,T.hair);ellipse(-0.086,head-0.055,0.029,0.107,T.hair);}
+ if(p.type==='granny'||p.type==='gossip')ellipse(-0.048,head+hr*0.62,0.037,0.032,T.hair);
+ // Asymmetric face: temple, nose bridge, nose, lips and chin, facing travel direction.
+ var face=g.createLinearGradient(-hr,0,hr,0);face.addColorStop(0,shade(skin,-0.22));face.addColorStop(0.65,shade(skin,0.09));face.addColorStop(1,skin);
+ g.fillStyle=face;g.beginPath();g.moveTo(-hr*0.72,-(head+hr*0.35));g.bezierCurveTo(-hr*0.72,-(head+hr),hr*0.70,-(head+hr),hr*0.73,-(head+hr*0.34));g.lineTo(hr*0.76,-(head+hr*0.04));g.lineTo(hr*1.04,-(head-hr*0.16));g.quadraticCurveTo(hr*1.09,-(head-hr*0.26),hr*0.76,-(head-hr*0.27));g.quadraticCurveTo(hr*0.77,-(head-hr*0.85),hr*0.27,-(head-hr*0.94));g.quadraticCurveTo(-hr*0.51,-(head-hr*0.85),-hr*0.63,-(head-hr*0.30));g.closePath();g.fill();
+ ellipse(-hr*0.57,head-hr*0.12,hr*0.22,hr*0.32,skin);
+ line([[-hr*0.61,head-hr*0.01],[-hr*0.48,head-hr*0.20]],shade(skin,-0.30),0.005);
+ g.fillStyle=T.hair;g.beginPath();g.moveTo(-hr*0.82,-(head-hr*0.10));g.bezierCurveTo(-hr*1.1,-(head+hr*1.24),hr*0.74,-(head+hr*1.28),hr*0.82,-(head+hr*0.42));g.lineTo(hr*0.38,-(head+hr*0.57));g.lineTo(-hr*0.03,-(head+hr*0.28));g.lineTo(-hr*0.41,-(head+hr*0.22));g.lineTo(-hr*0.50,-(head-hr*0.12));g.closePath();g.fill();
+ line([[-hr*0.56,head+hr*0.57],[-hr*0.10,head+hr*0.78],[hr*0.47,head+hr*0.67]],shade(T.hair,0.24),0.007);
+ if(h>23){
+  line([[hr*0.24,head+hr*0.18],[hr*0.60,head+hr*0.16]],'#443431',0.008);
+  ellipse(hr*0.48,head+hr*0.025,hr*0.15,hr*0.075,'#f5e7d7');ellipse(hr*0.54,head+hr*0.025,hr*0.060,hr*0.08,'#252528');
+  line([[hr*0.41,head-hr*0.50],[hr*0.73,head-hr*0.48]],'#a05e54',0.005);
+  if(elder){line([[hr*0.11,head-hr*0.06],[hr*0.18,head-hr*0.12]],shade(skin,-0.30),0.004);}
+ }
+ if(p.type==='granny'||p.type==='phone'){
+  g.strokeStyle='#555661';g.lineWidth=0.006;g.beginPath();g.ellipse(hr*0.43,-(head+hr*0.005),hr*0.33,hr*0.23,0,0,Math.PI*2);g.stroke();line([[-hr*0.48,head+hr*0.09],[hr*0.09,head+hr*0.06]],'#555661',0.006);
+ }
+ arm(false);
+ drawCharacterSignature(p,{ellipse:ellipse,line:line,poly:poly,head:head,hr:hr,sh:sh,hand:rightHand,left:leftHand});
+ if(a==='phone'||a==='selfie'){
+  var hand=rightHand;g.save();g.translate(hand[0],-hand[1]);g.rotate(a==='selfie'?-0.12:0.15);g.fillStyle='#242f40';rr(-0.022,-0.058,0.045,0.080,0.006);g.fill();g.fillStyle='#a2cde1';g.fillRect(-0.016,-0.047,0.032,0.053);g.restore();
+ }
+ if(p.type==='granny'){
+  line([[rightHand[0],rightHand[1]],[rightHand[0]+0.025,-crouch]],'#74543c',0.010);ellipse(rightHand[0]+0.025,-crouch,0.015,0.009,'#343239');
+ }
+ g.restore();
+}
+
+
+// Character props are attached to the same animated hands as the body.
+function drawCharacterSignature(p,v){
+ var E=v.ellipse,L=v.line,P=v.poly,H=v.head,R=v.hr,S=v.sh,C=v.hand,B=v.left;
+ var t=G.t,w=Math.sin(t*5),type=p.T.look||p.type;
+ function box(x,y,w,h,c){P([[x,y],[x+w,y],[x+w,y-h],[x,y-h]],c);}
+ function cap(c){E(0,H+R*0.7,R*1.10,R*0.46,c);L([[-R,H+R*0.52],[R*1.75,H+R*0.52]],c,0.018);}
+ function bag(c){L([[B[0]-0.025,B[1]-0.09],[B[0],B[1]],[B[0]+0.04,B[1]-0.09]],c,0.008);box(B[0]-0.055,B[1]-0.07,0.13,0.14,c);}
+ if(type==='normal'){
+  box(C[0]-0.027,C[1]+0.02,0.064,0.092,'#efdfbf');L([[C[0]-0.034,C[1]+0.023],[C[0]+0.043,C[1]+0.023]],'#563d36',0.015);
+  L([[C[0],C[1]+0.05],[C[0]+0.012*w,C[1]+0.09]],'#ded9ce',0.009);bag('#5d777c');
+ }
+ if(type==='hesitate'||type==='tourist'){
+  P([[-0.14,0.70],[-0.03,0.66],[0.06,0.70],[0.19,0.66],[0.19,0.47],[0.06,0.51],[-0.03,0.47],[-0.14,0.51]],'#e9dfb6');
+  L([[-0.11,0.60],[-0.02,0.55],[0.07,0.63],[0.15,0.55]],'#6c9b86',0.020);L([[-0.03,0.66],[-0.03,0.48]],'#b9aa89',0.006);
+  if(type==='tourist'){cap('#cbb687');L([[-0.02,0.84],[0.12,0.55]],'#7c4a32',0.022);box(-0.05,0.60,0.105,0.065,'#3b4652');E(0.01,0.57,0.025,0.025,'#93b3c2');}
+  else{L([[-R*0.5,H+R*0.9],[-R*0.2,H+R*1.6],[R*0.1,H+R]],'#2d241d',0.015);}
+ }
+ if(type==='phone'){L([[-R*0.8,H],[-R*0.9,H+R*0.6],[0,H+R*1.08],[R*0.75,H+R*0.6]],'#222637',0.023);E(-R*0.7,H,0.025,0.04,'#8669c3');}
+ if(type==='granny'){bag('#975478');}
+ if(type==='dog'){cap('#b29663');box(-0.08,0.76,0.045,0.055,'#365238');L([[0.07,0.77],[0.05,0.52]],'#d4c48a',0.020);}
+ if(type==='dropper'){bag('#483934');P([[0,0.77],[0.06,0.63],[0.14+0.03*w,0.66],[0.08,0.59],[-0.01,0.73]],'#b23d54');}
+ if(type==='kid'){
+  cap('#e96047');L([[0,H+R],[0,H+R*1.5]],'#4d79b2',0.01);L([[-0.09,H+R*1.5],[0.09,H+R*1.5]],'#55b7a8',0.016);E(0,H+R*1.5,0.017,0.014,'#f6dc56');
+ }
+ if(type==='taichi'){P([[-0.03,H-0.055],[0.03,H-0.045],[0.024,H-0.16],[-0.008,H-0.20]],'#d9d8cd');L([[-R,H+R*0.35],[R,H+R*0.35]],'#a84043',0.014);}
+ if(type==='selfie'){L([[-0.04,0.78],[0.13,0.5]],'#f6d794',0.012);box(0.085,0.51,0.095,0.086,'#eabade');E(R*0.8,H-R*0.35,0.012,0.02,'#f6d794');}
+ if(type==='uturn'){E(C[0]+0.05,C[1]-0.07,0.052,0.052,'#e3b442');E(C[0]+0.05,C[1]-0.07,0.027,0.027,'#695fa1');L([[C[0]+0.07,C[1]-0.11],[C[0]+0.14,C[1]-0.25]],'#e3b442',0.022);L([[C[0]+0.13,C[1]-0.21],[C[0]+0.17,C[1]-0.19]],'#e3b442',0.025);}
+ if(type==='gossip'){bag('#dc874f');E(-0.055,H+0.015,0.05,0.07,'#312328');E(-0.04,H+0.06,0.07,0.06,'#312328');L([[B[0],B[1]-0.06],[B[0]-0.025,B[1]+0.09]],'#5c9652',0.022);}
+ if(type==='fridge'){cap('#e58c3d');L([[-0.07,0.78],[-0.045,0.51]],'#c8b49e',0.025);}
+ if(type==='drunk'){E(R*0.3,H-R*0.35,0.025,0.013,'#c65d62');box(C[0]-0.018,C[1],0.045,0.15,'#608a51');box(C[0]-0.01,C[1]+0.045,0.027,0.065,'#779c61');box(C[0]-0.018,C[1]-0.055,0.045,0.044,'#e4dcb9');P([[0,0.80],[0.055,0.72],[0.10,0.62],[0.06,0.61],[-0.01,0.76]],'#dbb55b');}
+ if(type==='runner'){L([[-R,H+R*0.5],[R,H+R*0.5]],'#f9df83',0.02);box(-0.075,0.71,0.15,0.11,'#f8efdd');L([[-0.04,0.68],[0.03,0.68],[-0.015,0.62]],'#cf5c39',0.013);box(C[0]-0.026,C[1]+0.012,0.054,0.025,'#f5eedc');}
+ if(type==='chef'){
+  box(-0.062,H+0.19,0.13,0.14,'#ecebdf');[-0.062,0,0.062].forEach(function(x){E(x,H+0.19,0.053,0.049,'#fff8e8');});
+  P([[-0.067,0.75],[0.07,0.75],[0.10,0.48],[-0.085,0.48]],'#e5e6dc');L([[C[0],C[1]],[C[0]+0.14,C[1]+0.01]],'#606778',0.018);E(C[0]+0.18,C[1]+0.015,0.09,0.034,'#343c4c');
+  E(C[0]+0.18,C[1]+0.06+(p.anim==='cook'?Math.abs(w)*0.08:0),0.035,0.012,'#e5ac49');
+ }
+ if(type==='balloon')for(var i=0;i<3;i++){
+  var x=C[0]+(i-1)*0.14+Math.sin(t*2+i)*0.025,y=H+0.22+(i===1?0.08:0);
+  L([[C[0],C[1]],[x,y-0.10]],'#b3ad9c',0.004);E(x,y,0.076,0.105,['#e57385','#e3b744','#64b9ce'][i]);E(x-0.025,y+0.035,0.012,0.028,'#ffffff');
+ }
+ if(type==='rocker'){
+  for(var i=0;i<4;i++)P([[-0.055+i*0.03,H+0.04],[-0.065+i*0.03,H+0.13+(i%2)*0.045],[-0.025+i*0.03,H+0.04]],'#c83c81');
+  L([[-0.06,0.81],[0.13,0.45]],'#bc985c',0.019);E(0.02,0.53,0.093,0.105,'#bc6540');E(0.045,0.54,0.033,0.033,'#382b36');L([[0.05,0.58],[0.23,0.81]],'#bfa374',0.033);L([[0.025,0.51],[0.23,0.81]],'#e4d2ac',0.005);
+ }
+ if(type==='student'){
+  for(var i=0;i<5;i++){var bx=-0.10+(i%2)*0.014;box(bx,0.58+i*0.048,0.21,0.045,['#b75457','#ccae46','#3c8794','#755497','#5b955b'][i]);L([[bx+0.025,0.56+i*0.048],[bx+0.19,0.56+i*0.048]],'#f2e8cf',0.022);}
+  E(R*0.43,H,0.032,0.027,'#344664');E(R*0.43,H,0.024,0.019,'#b8d4de');
+ }
+ if(type==='painter'){
+  E(-0.012,H+R*0.87,0.09,0.035,'#4b435b');E(-0.04,H+R*1.30,0.015,0.015,'#4b435b');
+  ['#ce594c','#669357','#4c90bd','#d6a444'].forEach(function(c,i){E((i%2?0.05:-0.04),0.69-Math.floor(i/2)*0.09,0.022,0.013,c);});
+  E(B[0]-0.02,B[1]-0.03,0.075,0.046,'#b48b60');for(var i=0;i<3;i++)E(B[0]-0.06+i*0.035,B[1]-0.022,0.011,0.013,['#e96955','#58aaca','#dcb447'][i]);L([[C[0],C[1]],[C[0]+0.025,C[1]+0.11]],'#b59463',0.01);E(C[0]+0.026,C[1]+0.115,0.013,0.026,'#639fc1');
+ }
+ if(type==='magician'){
+  P([[-0.07,0.81],[-0.20-0.02*w,0.39],[0.045,0.46],[0.07,0.81]],'#692e65');box(-0.065,H+0.22,0.13,0.17,'#262238');L([[-0.11,H+0.05],[0.12,H+0.05]],'#262238',0.025);box(-0.065,H+0.095,0.13,0.027,'#b25a77');
+  L([[C[0],C[1]],[C[0]+0.11,C[1]+0.10]],'#292a36',0.012);L([[C[0]+0.085,C[1]+0.08],[C[0]+0.11,C[1]+0.10]],'#f2edde',0.016);
+  if(p.anim==='magic'){E(-0.12,0.81,0.035,0.035,'#f3ebe2');E(-0.14,0.86,0.011,0.04,'#f3ebe2');E(-0.11,0.86,0.011,0.04,'#f3ebe2');}
+ }
+ if(type==='pineapple'){
+  E(0,0.63,0.18,0.23,'#dbb23c');for(var j=0;j<4;j++)L([[-0.12,0.52+j*0.062],[0.12,0.44+j*0.062]],'#a47d31',0.008);
+  for(var i=0;i<5;i++)P([[-0.055+i*0.022,H+0.025],[(i-2)*0.056,H+0.15+(2-Math.abs(i-2))*0.03],[0.01+i*0.018,H+0.025]],i%2?'#42844e':'#64a151');
+ }
+ if(type==='astronaut'){
+  g.strokeStyle='#e4e9e8';g.lineWidth=0.026;g.beginPath();g.ellipse(0,-H,0.108,0.12,0,0,Math.PI*2);g.stroke();E(0.022,H,0.075,0.083,'#7596ae');E(0.055,H+0.035,0.015,0.035,'#cce1e6');box(-0.07,0.72,0.14,0.12,'#9eabb5');for(var i=0;i<3;i++)E(-0.04+i*0.04,0.68,0.011,0.011,['#d45e54','#dfb850','#67b299'][i]);
+ }
+ if(type==='robot'){
+  box(-0.078,H+0.095,0.166,0.17,'#79b9bc');box(-0.06,H+0.045,0.135,0.045,'#293f53');E(-0.025,H+0.023,0.012,0.012,'#e8b950');E(0.035,H+0.023,0.012,0.012,'#e8b950');L([[-0.03,H-0.045],[0.04,H-0.045]],'#38586b',0.009);L([[0,H+0.09],[0,H+0.17]],'#426576',0.01);E(0,H+0.18,0.024,0.024,w>0?'#df6960':'#9d504d');box(-0.07,0.71,0.14,0.09,'#305064');box(-0.05,0.69,0.015,0.05,'#dc6457');
+ }
+ if(type==='dancer'){
+  cap('#71367f');L([[-0.07,0.83],[0,0.76],[0.07,0.83]],'#e5c85a',0.01);E(0,0.76,0.022,0.025,'#e5c85a');box(-0.07,H+0.024,0.145,0.035,'#383043');L([[-0.065,H+0.03],[0.07,H+0.03]],'#d873b7',0.008);
+ }
+}
+
+function drawCat(x,y,hpx,p){
+ var c=shade('#b58352',G.night?-0.3:0);
+ g.fillStyle=c;
+ rr(x-hpx*0.55,y-hpx*0.62,hpx*1.1,hpx*0.45,hpx*0.2);g.fill();
+ g.beginPath();g.arc(x-p.dir*hpx*0.55,y-hpx*0.62,hpx*0.3,0,6.3);g.fill();
+ g.beginPath();g.moveTo(x-p.dir*hpx*0.72,y-hpx*0.82);g.lineTo(x-p.dir*hpx*0.60,y-hpx*1.05);g.lineTo(x-p.dir*hpx*0.46,y-hpx*0.80);g.fill();
+ g.strokeStyle=c;g.lineWidth=Math.max(1,hpx*0.12);g.lineCap='round';
+ g.beginPath();g.moveTo(x+p.dir*hpx*0.5,y-hpx*0.55);g.quadraticCurveTo(x+p.dir*hpx*0.95,y-hpx*0.9,x+p.dir*hpx*0.8,y-hpx*1.25);g.stroke();
+ g.lineWidth=Math.max(1,hpx*0.10);
+ g.beginPath();g.moveTo(x-hpx*0.3,y-hpx*0.25);g.lineTo(x-hpx*0.3,y);g.stroke();
+ g.beginPath();g.moveTo(x+hpx*0.3,y-hpx*0.25);g.lineTo(x+hpx*0.3,y);g.stroke();
+}
+function drawScooter(x,y,hpx,p){
+ var s=hpx;
+ g.fillStyle=shade('#2fae6a',G.night?-0.25:0);
+ rr(x-s*0.42,y-s*0.52,s*0.84,s*0.30,s*0.08);g.fill();
+ g.fillStyle='#1c1f26';
+ g.beginPath();g.arc(x-s*0.42,y-s*0.16,s*0.17,0,6.3);g.fill();
+ g.beginPath();g.arc(x+s*0.42,y-s*0.16,s*0.17,0,6.3);g.fill();
+ g.fillStyle=shade('#3a6fd8',G.night?-0.25:0);
+ rr(x-s*0.14,y-s*1.0,s*0.28,s*0.42,s*0.09);g.fill();
+ g.fillStyle=shade('#e0b48d',G.night?-0.25:0);
+ g.beginPath();g.arc(x,y-s*1.12,s*0.13,0,6.3);g.fill();
+ g.fillStyle='#e34b3f';g.beginPath();g.arc(x,y-s*1.14,s*0.145,3.34,6.08);g.fill();
+ g.fillStyle=shade('#2fae6a',0.1);
+ rr(x-s*0.30,y-s*0.92,s*0.24,s*0.30,s*0.05);g.fill();
+}
+
+function drawImpact(){
+ var C=G.crash, dz=C.iz-G.carZ;
+ if(dz<0.4)return;
+ var p=project(C.ix,C.iy,dz);
+ if(C.t<0.42){
+  var a=1-C.t/0.42;
+  g.globalCompositeOperation='lighter';
+  g.globalAlpha=a*0.75;
+  var R=p.s*(0.5+C.t*7);
+  var gr2=g.createRadialGradient(p.x,p.y,0,p.x,p.y,R);
+  gr2.addColorStop(0,'rgba(255,250,230,.9)');gr2.addColorStop(1,'rgba(255,220,140,0)');
+  g.fillStyle=gr2;g.beginPath();g.arc(p.x,p.y,R,0,6.3);g.fill();
+  g.strokeStyle='rgba(255,248,225,'+(a*0.8)+')';
+  g.lineWidth=Math.max(1,p.s*0.03);
+  for(var i=0;i<10;i++){
+   var an=i*0.628+0.3, r0=R*0.35, r1=R*(0.85+((i*7)%3)*0.15);
+   g.beginPath();g.moveTo(p.x+Math.cos(an)*r0,p.y+Math.sin(an)*r0*0.7);
+   g.lineTo(p.x+Math.cos(an)*r1,p.y+Math.sin(an)*r1*0.7);g.stroke();
+  }
+  g.globalAlpha=1;g.globalCompositeOperation='source-over';
+ }
+ if(C.t<0.85){
+  var a2=clamp(1-(C.t-0.35)/0.5,0,1);
+  g.globalAlpha=a2;
+  g.font='900 '+(H*0.13).toFixed(0)+'px "Noto Sans TC",sans-serif';
+  g.textAlign='center';g.textBaseline='middle';
+  g.lineWidth=Math.max(3,H*0.012);g.strokeStyle='rgba(20,10,10,.85)';
+  var ty=H*0.30+(1-a2)*H*0.04;
+  g.strokeText('碰！',W*0.5,ty);
+  g.fillStyle='#ffe07a';g.fillText('碰！',W*0.5,ty);
+  g.textAlign='left';g.textBaseline='alphabetic';g.globalAlpha=1;
+ }
+}
+
+function drawLabels(){
+ var L=G._labels; if(!L||!L.length)return;
+ L.sort(function(a,b){return a.dz-b.dz;});
+ var seen={},placed=[],out=[];
+ for(var i=0;i<L.length&&out.length<3;i++){
+  if(seen[L[i].txt])continue; seen[L[i].txt]=1; out.push(L[i]);
+ }
+ out.forEach(function(l){
+  g.font='600 '+l.fs.toFixed(0)+'px "Noto Sans TC",sans-serif';
+  var tw=g.measureText(l.txt).width, y=l.y;
+  for(var k=0;k<8;k++){
+   var hit=false;
+   for(var j=0;j<placed.length;j++){
+    var p=placed[j];
+    if(Math.abs(p.x-l.x)<(p.w+tw)/2+8&&Math.abs(p.y-y)<20){hit=true;break;}
+   }
+   if(!hit)break; y-=21;
+  }
+  placed.push({x:l.x,y:y,w:tw});
+  g.fillStyle='rgba(14,16,22,.68)';rr(l.x-tw/2-6,y-13,tw+12,17,3);g.fill();
+  g.fillStyle='#f2ede4';g.textAlign='center';g.fillText(l.txt,l.x,y);g.textAlign='left';
+ });
+}
+
+function drawBubbles(){
+ var used=[];
+ G.peds.forEach(function(p){
+  if(!p.bubble||p.bubbleT<=0)return;
+  var dz=p.z-G.carZ;
+  if(dz<1||dz>65)return;
+  var pr=project(p.x,p.y||0,dz),hpx=p.h*pr.s;
+  if(hpx<26)return;
+  if(hpx>H*1.6)hpx=H*1.6;
+  var fs=Math.max(11,Math.min(17,hpx*0.12));
+  g.font='600 '+fs.toFixed(0)+'px "Noto Sans TC",sans-serif';
+  var tw=g.measureText(p.bubble).width;
+  var bx=pr.x, by=Math.max(pr.y-hpx*(1.30+(p.T.topExtra||0)),H*0.175);
+  for(var u=0;u<6;u++){
+   var hit=false;
+   for(var j=0;j<used.length;j++){
+    if(Math.abs(used[j].x-bx)<(used[j].w+tw)/2+10&&Math.abs(used[j].y-by)<fs+18){hit=true;break;}
+   }
+   if(!hit)break; by+=fs+20;
+  }
+  used.push({x:bx,y:by,w:tw});
+  g.globalAlpha=clamp(p.bubbleT/0.6,0,1);
+  g.fillStyle='rgba(250,248,242,.95)';
+  rr(bx-tw/2-9,by-fs-7,tw+18,fs+14,9);g.fill();
+  g.beginPath();g.moveTo(bx-5,by+6);g.lineTo(bx+5,by+6);g.lineTo(bx,by+13);g.fill();
+  g.fillStyle='#1d2028';g.textAlign='center';g.fillText(p.bubble,bx,by);g.textAlign='left';
+  g.globalAlpha=1;
+ });
+}
+
+function drawGoal(){
+ var dz=G.L.goal-G.carZ;
+ if(dz<0.5||dz>190)return;
+ var l=project(-ROAD_H,0,dz),r=project(ROAD_H,0,dz),lt=project(-ROAD_H,5.6,dz),rt=project(ROAD_H,5.6,dz);
+ g.fillStyle='#2c3140';
+ g.fillRect(l.x-Math.max(1,l.s*0.1),lt.y,Math.max(2,l.s*0.2),l.y-lt.y);
+ g.fillRect(r.x-Math.max(1,r.s*0.1),rt.y,Math.max(2,r.s*0.2),r.y-rt.y);
+ var bh=Math.max(6,(l.y-lt.y)*0.16);
+ g.fillStyle='#57c98a';g.fillRect(lt.x,lt.y,rt.x-lt.x,bh);
+ if(bh>13){
+  g.fillStyle='#0e1116';g.font='800 '+(bh*0.66).toFixed(0)+'px "Noto Sans TC",sans-serif';
+  g.textAlign='center';g.textBaseline='middle';
+  g.fillText('目 的 地',(lt.x+rt.x)/2,lt.y+bh*0.55);
+  g.textAlign='left';g.textBaseline='alphabetic';
+ }
+ // 地面棋盤
+ for(var i=0;i<10;i++){
+  var xa=-ROAD_H+i*(ROAD_H*2/10);
+  var A=project(xa,0.013,dz+0.9),B=project(xa+ROAD_H*2/10,0.013,dz+0.9),
+      C=project(xa+ROAD_H*2/10,0.013,dz-0.9),D=project(xa,0.013,dz-0.9);
+  quad(A,B,C,D);g.fillStyle=(i%2)?'#e6e1d2':'#2c3140';g.fill();
+ }
+}
+
+function drawNightFX(){
+ // darken -> glow -> tint
+ g.globalCompositeOperation='multiply';
+ g.fillStyle='#525f8f';g.fillRect(0,0,W,H);
+ g.globalCompositeOperation='lighter';
+ var hl=g.createLinearGradient(0,HZ,0,H);
+ hl.addColorStop(0,'rgba(255,232,178,0)');hl.addColorStop(0.55,'rgba(255,228,168,.16)');hl.addColorStop(1,'rgba(255,224,158,.46)');
+ g.beginPath();
+ var a=project(-1.0,0,2.6),b=project(ROAD_H+0.8,0,2.6),c=project(ROAD_H+4.4,0,56),d=project(-5.0,0,56);
+ g.moveTo(d.x,d.y);g.lineTo(c.x,c.y);g.lineTo(b.x,b.y);g.lineTo(a.x,a.y);g.closePath();
+ g.fillStyle=hl;g.fill();
+ g.globalCompositeOperation='source-over';
+}
+function drawDuskFX(){
+ g.globalCompositeOperation='multiply';
+ g.fillStyle='#c8a2b4';g.fillRect(0,0,W,H);
+ g.globalCompositeOperation='lighter';
+ var w=g.createLinearGradient(0,HZ-H*0.16,0,HZ+H*0.10);
+ w.addColorStop(0,'rgba(255,150,90,.20)');w.addColorStop(1,'rgba(255,140,80,0)');
+ g.fillStyle=w;g.fillRect(0,HZ-H*0.16,W,H*0.26);
+ g.globalCompositeOperation='source-over';
+}
+function drawRain(){
+ // 濕滑路面反光
+ g.globalCompositeOperation='lighter';
+ var wet=g.createLinearGradient(0,HZ,0,H);
+ wet.addColorStop(0,'rgba(150,175,195,.16)');wet.addColorStop(1,'rgba(120,145,170,0)');
+ g.fillStyle=wet;g.fillRect(0,HZ,W,H-HZ);
+ g.globalCompositeOperation='source-over';
+ var r=mulberry(Math.floor(G.t*13));
+ g.strokeStyle='rgba(210,225,235,.42)';g.lineWidth=1.2;
+ for(var i=0;i<90;i++){
+  var x=r()*W,y=r()*H,len=8+r()*16;
+  g.beginPath();g.moveTo(x,y);g.lineTo(x-3,y+len);g.stroke();
+ }
+ // 雨刷
+ var ang=Math.sin(G.wiper)*0.55;
+ g.save();
+ var ox=W*0.42,oy=H*0.95;
+ g.translate(ox,oy);g.rotate(-0.35+ang);
+ g.strokeStyle='rgba(22,25,32,.85)';g.lineWidth=Math.max(4,W*0.008);
+ g.beginPath();g.moveTo(0,0);g.lineTo(0,-H*0.68);g.stroke();
+ g.restore();
+ g.save();
+ g.translate(W*0.86,oy);g.rotate(-0.35+ang);
+ g.strokeStyle='rgba(22,25,32,.7)';g.lineWidth=Math.max(3,W*0.006);
+ g.beginPath();g.moveTo(0,0);g.lineTo(0,-H*0.5);g.stroke();
+ g.restore();
+}
+
+/* 車輛號誌重複顯示器：接近有號誌的路口時，左上角固定顯示車輛號誌與讀秒（避免被後照鏡或距離擋住） */
+function drawSignalRepeater(dashY){
+ if(!G.crosses)return;
+ var c=null,bd=1e9;
+ for(var i=0;i<G.crosses.length;i++){var cc=G.crosses[i];if(!cc.light||cc.passed)continue;var d=cc.z-(G.carZ+BUMPER);if(d>-5&&d<100&&d<bd){bd=d;c=cc;}}
+ if(!c)return;
+ var st=lightState(c,G.t);
+ var x=W*0.03,y=H*0.115,pw=W*0.205,ph=H*0.075,r=H*0.014,pad=H*0.014,gap=r*2.4;
+ g.fillStyle='rgba(10,13,19,.82)';rr(x,y,pw,ph,7);g.fill();
+ g.strokeStyle='rgba(242,237,228,.16)';g.lineWidth=1;rr(x,y,pw,ph,7);g.stroke();
+ var cx0=x+pad+r,cy=y+pad+r;
+ var cols=[['r','#ff5a4a'],['y','#f5c33c'],['g','#4fd58a']];
+ for(var i=0;i<3;i++){var on=st.s===cols[i][0];
+  g.fillStyle=on?cols[i][1]:shade(cols[i][1],-0.62);
+  g.beginPath();g.arc(cx0+i*gap,cy,r,0,6.3);g.fill();
+  if(on){g.globalAlpha=0.32;g.beginPath();g.arc(cx0+i*gap,cy,r*1.55,0,6.3);g.fill();g.globalAlpha=1;}
+ }
+ g.fillStyle=st.s==='r'?'#ff8a7a':(st.s==='y'?'#f5c33c':'#7ff0b0');
+ g.font='800 '+(H*0.028).toFixed(0)+'px "Noto Sans TC",sans-serif';g.textAlign='right';g.textBaseline='middle';
+ g.fillText(Math.ceil(st.left)+'s',x+pw-pad,cy);
+ g.font='600 '+(H*0.016).toFixed(0)+'px "Noto Sans TC",sans-serif';g.fillStyle='#c3cbd6';g.textAlign='left';g.textBaseline='alphabetic';
+ g.fillText(st.s==='r'?'車輛號誌：紅燈，停':(st.s==='y'?'車輛號誌：黃燈，準備停':'車輛號誌：綠燈，行'),x+pad,y+ph-H*0.016);
+ g.textAlign='left';g.textBaseline='alphabetic';
+}
+
+/* ---- 車內 ---- */
+function drawInterior(){
+ var dashY=H*0.775;
+ // A柱 + 車頂
+ g.fillStyle='#171a21';
+ g.beginPath();g.moveTo(0,0);g.lineTo(W,0);g.lineTo(W,H*0.075);
+ g.quadraticCurveTo(W*0.5,H*0.135,0,H*0.075);g.closePath();g.fill();
+ g.fillStyle='#1c202a';
+ g.beginPath();g.moveTo(0,H*0.03);g.lineTo(W*0.075,H*0.06);g.lineTo(W*0.105,dashY);g.lineTo(0,dashY);g.closePath();g.fill();
+ g.beginPath();g.moveTo(W,H*0.03);g.lineTo(W*0.925,H*0.06);g.lineTo(W*0.895,dashY);g.lineTo(W,dashY);g.closePath();g.fill();
+
+ // 後照鏡（移到右上角、避開中央懸掛式號誌，並下移避開離開鍵）
+ var mw=W*0.225,mh=H*0.084,mx=W-mw-9,my=H*0.066;
+ g.fillStyle='#0a0d12';rr(mx-5,my-5,mw+10,mh+10,7);g.fill();
+ g.strokeStyle='#333a46';g.lineWidth=1.5;rr(mx-5,my-5,mw+10,mh+10,7);g.stroke();
+ g.save();rr(mx,my,mw,mh,4);g.clip();
+ drawMirrorView(mx,my,mw,mh);
+ g.restore();
+ if(G.tail.honk>0){
+  g.fillStyle='#ffd166';g.font='700 '+(H*0.021).toFixed(0)+'px "Noto Sans TC",sans-serif';
+  g.textAlign='center';g.fillText('叭叭叭',mx+mw*0.5,my+mh+H*0.03);g.textAlign='left';
+ }
+ drawSignalRepeater(dashY);
+
+ // 儀表板
+ g.fillStyle='#12151c';
+ g.beginPath();g.moveTo(0,dashY+H*0.02);
+ g.quadraticCurveTo(W*0.5,dashY-H*0.04,W,dashY+H*0.02);
+ g.lineTo(W,H);g.lineTo(0,H);g.closePath();g.fill();
+ g.strokeStyle='#2b3140';g.lineWidth=2;
+ g.beginPath();g.moveTo(0,dashY+H*0.02);g.quadraticCurveTo(W*0.5,dashY-H*0.04,W,dashY+H*0.02);g.stroke();
+
+ // 方向盤（會隨轉向轉動，含雙手）
+ drawWheel(dashY);
+
+ // 時速表
+ var gx=W*0.735,gy=dashY+H*0.115,gr2=H*0.085;
+ g.fillStyle='#0c0f15';g.beginPath();g.arc(gx,gy,gr2*1.18,0,6.3);g.fill();
+ g.strokeStyle='#2f3644';g.lineWidth=2;g.beginPath();g.arc(gx,gy,gr2*1.18,0,6.3);g.stroke();
+ for(var i=0;i<=10;i++){
+  var an=Math.PI*0.78+ (Math.PI*1.44)*(i/10);
+  var on=(G.spd*3.6)>=i*10;
+  g.strokeStyle=on?(i>7?'#e0574a':'#57c98a'):'#39404f';
+  g.lineWidth=i%5===0?3:2;
+  g.beginPath();
+  g.moveTo(gx+Math.cos(an)*gr2*0.78,gy+Math.sin(an)*gr2*0.78);
+  g.lineTo(gx+Math.cos(an)*gr2*1.0,gy+Math.sin(an)*gr2*1.0);
+  g.stroke();
+ }
+ g.fillStyle='#f2ede4';g.font='800 '+(gr2*0.72).toFixed(0)+'px "Noto Sans TC",sans-serif';
+ g.textAlign='center';g.textBaseline='middle';
+ g.fillText(String(Math.round(G.spd*3.6)),gx,gy+gr2*0.06);
+ g.font='500 '+(gr2*0.30).toFixed(0)+'px "Noto Sans TC",sans-serif';g.fillStyle='#7d8798';
+ g.fillText('km/h',gx,gy+gr2*0.55);
+ g.font='500 '+(gr2*0.22).toFixed(0)+'px sans-serif';g.fillStyle='#a2b3c6';g.fillText('MAX 100',gx,gy-gr2*0.45);
+ g.textAlign='left';g.textBaseline='alphabetic';
+
+ // 停讓警示燈
+ var ly=dashY+H*0.055;
+ if(G.blocked){
+  var pulse=0.62+Math.sin(G.t*8)*0.32;
+  g.globalAlpha=pulse;
+  g.fillStyle='#e0574a';rr(W*0.375,ly,W*0.25,H*0.052,3);g.fill();
+  g.globalAlpha=1;
+  g.strokeStyle='rgba(255,190,180,.55)';g.lineWidth=1.5;
+  rr(W*0.375,ly,W*0.25,H*0.052,3);g.stroke();
+  g.fillStyle='#fff';g.font='800 '+(H*0.028).toFixed(0)+'px "Noto Sans TC",sans-serif';
+  g.textAlign='center';g.textBaseline='middle';
+  g.fillText('行人優先  停 讓',W*0.50,ly+H*0.027);
+  g.textAlign='left';g.textBaseline='alphabetic';
+ }
+
+ // 轉向方向燈（接近路口前閃爍，依下一個彎的方向顯示左/右）
+ if(G.steerLevel&&G.bends&&G.bends.length){
+  var nb=null;
+  for(var bi=0;bi<G.bends.length;bi++){var bb=G.bends[bi];if(G.carZ<bb.z+bb.len+8){nb=bb;break;}}
+  if(nb&&Math.sin(G.t*7)>0){
+   var rt=nb.ang>0, mm=rt?1:-1, ax=W*0.60, ay=dashY+H*0.055;
+   g.fillStyle='#4fd58a';
+   g.beginPath();
+   g.moveTo(ax+mm*H*0.026,ay);
+   g.lineTo(ax,ay-H*0.019); g.lineTo(ax,ay-H*0.008);
+   g.lineTo(ax-mm*H*0.02,ay-H*0.008); g.lineTo(ax-mm*H*0.02,ay+H*0.008);
+   g.lineTo(ax,ay+H*0.008); g.lineTo(ax,ay+H*0.019);
+   g.closePath(); g.fill();
+   g.font='700 '+(H*0.02).toFixed(0)+'px "Noto Sans TC",sans-serif'; g.textBaseline='middle';
+   if(rt){g.textAlign='left'; g.fillText('右轉',ax+H*0.036,ay);}
+   else{g.textAlign='right'; g.fillText('左轉',ax-H*0.036,ay);}
+   g.textAlign='left'; g.textBaseline='alphabetic';
+  }
+ }
+}
+
+function drawWheel(dashY){
+ var wx=W*0.30, wy=H*1.14, wr=H*0.31;
+ var ang=(G&&G.steerLevel)?G.steer*0.6:Math.sin((G?G.bob:0)*0.5)*0.015;
+ g.save(); g.translate(wx,wy); g.rotate(ang);
+ // 外圈陰影＋鋼圈
+ g.strokeStyle='#0c0f14'; g.lineWidth=H*0.052; g.beginPath(); g.arc(0,0,wr,0,6.3); g.stroke();
+ g.strokeStyle='#22262f'; g.lineWidth=H*0.036; g.beginPath(); g.arc(0,0,wr,0,6.3); g.stroke();
+ g.strokeStyle='#333a46'; g.lineWidth=H*0.008; g.beginPath(); g.arc(0,0,wr*0.995,0,6.3); g.stroke();
+ // 輻條
+ g.strokeStyle='#20242e'; g.lineWidth=wr*0.11; g.lineCap='round';
+ [-Math.PI*0.5, Math.PI*0.16, Math.PI*0.84].forEach(function(a){
+  g.beginPath(); g.moveTo(0,0); g.lineTo(Math.cos(a)*wr*0.80, Math.sin(a)*wr*0.80); g.stroke();
+ });
+ // 中央盤
+ g.fillStyle='#171a21'; g.beginPath(); g.arc(0,0,wr*0.22,0,6.3); g.fill();
+ g.strokeStyle='#3a4150'; g.lineWidth=1.5; g.beginPath(); g.arc(0,0,wr*0.22,0,6.3); g.stroke();
+ g.fillStyle='#39404f'; g.beginPath(); g.arc(0,0,wr*0.05,0,6.3); g.fill();
+ // 雙手（10 與 2 點鐘，隨盤轉動）
+ [-Math.PI*0.70, -Math.PI*0.30].forEach(function(a){
+  var hx=Math.cos(a)*wr, hy=Math.sin(a)*wr;
+  g.save(); g.translate(hx,hy); g.rotate(a+Math.PI/2);
+  g.fillStyle='#0c0f14'; rr(-wr*0.135,-wr*0.10,wr*0.27,wr*0.40,wr*0.10); g.fill(); // 陰影
+  g.fillStyle=(G&&G.night)?'#c49b7c':'#e2b78f';
+  rr(-wr*0.12,-wr*0.15,wr*0.24,wr*0.34,wr*0.09); g.fill();                        // 手背
+  g.fillStyle=(G&&G.night)?'#b98e6f':'#d5aa80';
+  for(var f=0;f<4;f++){ rr(-wr*0.11+f*wr*0.058,-wr*0.20,wr*0.048,wr*0.12,wr*0.02); g.fill(); }
+  g.fillStyle=(G&&G.night)?'#a87f60':'#c79c73';
+  rr(-wr*0.16,-wr*0.04,wr*0.09,wr*0.16,wr*0.03); g.fill();                        // 拇指
+  g.restore();
+ });
+ g.restore();
+}
+
+function drawHood(){
+ var col='#c3ccd8';                 // 車身：銀藍
+ var topY=H*0.655, botY=H*0.83;
+ var par=(G.steerLevel? -G.steer*W*0.028:0);
+ var cx=W*0.5+par;
+ var topW=W*0.22, botW=W*1.02;
+ function xAt(y,w){return w;}
+ // 主體
+ var g0=g.createLinearGradient(0,topY,0,botY);
+ g0.addColorStop(0,shade(col,G.night?-0.52:-0.06));
+ g0.addColorStop(0.45,shade(col,G.night?-0.42:0.05));
+ g0.addColorStop(1,shade(col,G.night?-0.56:-0.12));
+ g.fillStyle=g0;
+ g.beginPath();
+ g.moveTo(cx-topW/2,topY); g.lineTo(cx+topW/2,topY);
+ g.lineTo(cx+botW/2,botY); g.lineTo(cx-botW/2,botY); g.closePath(); g.fill();
+ // 前緣暗邊
+ g.fillStyle=shade(col,-0.30);
+ g.fillRect(cx-topW/2,topY-Math.max(2,H*0.006),topW,Math.max(2,H*0.007));
+ // 中央折線
+ g.strokeStyle=shade(col,-0.24); g.lineWidth=Math.max(1,H*0.004);
+ g.beginPath(); g.moveTo(cx,topY); g.lineTo(cx,botY); g.stroke();
+ // 兩側稜線
+ g.globalAlpha=0.55; g.strokeStyle=shade(col,0.18); g.lineWidth=Math.max(1,H*0.003);
+ g.beginPath(); g.moveTo(cx-topW*0.34,topY); g.lineTo(cx-botW*0.30,botY); g.stroke();
+ g.beginPath(); g.moveTo(cx+topW*0.34,topY); g.lineTo(cx+botW*0.30,botY); g.stroke();
+ g.globalAlpha=1;
+ // 天空反光
+ g.globalCompositeOperation='lighter';
+ var sc=skyCols();
+ g.globalAlpha=G.night?0.05:0.13; g.fillStyle=sc[1];
+ g.beginPath();
+ g.moveTo(cx-topW*0.42,topY); g.lineTo(cx+topW*0.06,topY);
+ g.lineTo(cx+botW*0.10,botY); g.lineTo(cx-botW*0.44,botY); g.closePath(); g.fill();
+ g.globalAlpha=1; g.globalCompositeOperation='source-over';
+ // 車標
+ var ey=topY+(botY-topY)*0.14;
+ g.fillStyle=shade(col,0.22);
+ g.beginPath(); g.arc(cx,ey,Math.max(3,H*0.012),0,6.3); g.fill();
+ g.strokeStyle=shade(col,-0.32); g.lineWidth=1.3; g.stroke();
+}
+
+function drawTurnArrow(zc,right){
+ var dz=zc-G.carZ; if(dz<1.5||dz>85)return;
+ var m=right?1:-1;
+ g.fillStyle=G.night?shade(PAL.line,-0.22):PAL.line;
+ g.globalAlpha=0.88;
+ function P(lx,fz){return project(CAR_X+lx,0.014,fz-G.carZ);}
+ var a=P(-0.17,zc-2.4),b=P(0.17,zc-2.4),c=P(0.17,zc+0.5),d=P(-0.17,zc+0.5);
+ quad(a,b,c,d); g.fill();
+ var e=P(-0.05*m,zc+0.18),f=P(1.45*m,zc+0.18),h2=P(1.45*m,zc+0.85),i2=P(-0.05*m,zc+0.85);
+ quad(e,f,h2,i2); g.fill();
+ var t1=P(1.2*m,zc-0.35),t2=P(2.25*m,zc+0.5),t3=P(1.2*m,zc+1.35);
+ g.beginPath(); g.moveTo(t1.x,t1.y); g.lineTo(t2.x,t2.y); g.lineTo(t3.x,t3.y); g.closePath(); g.fill();
+ g.globalAlpha=1;
+}
+
+function drawMirrorView(mx,my,mw,mh){
+ var T=G.tail, hz=my+mh*0.34;
+ // 背景：天空與路面
+ var sc=skyCols();
+ g.fillStyle=G.night?'#0a0e1a':(G.rain?shade(sc[1],-0.2):shade(sc[1],-0.05));
+ g.fillRect(mx,my,mw,mh);
+ g.fillStyle=G.night?shade(PAL.asphalt,-0.5):(G.rain?shade(PAL.asphalt,-0.28):shade(PAL.asphalt,-0.06));
+ g.fillRect(mx,hz,mw,my+mh-hz);
+ // 兩側建築剪影
+ g.fillStyle=G.night?'#131828':shade(sc[2],-0.36);
+ var off=(G.carZ*6)%(mw*0.22);
+ for(var i=-1;i<8;i++){
+  var bw=mw*0.11,bh=mh*(0.14+((i*37)%5)*0.045);
+  g.fillRect(mx+i*bw*1.05-off,hz-bh,bw*0.9,bh);
+  g.fillRect(mx+mw-(i*bw*1.05-off)-bw*0.9,hz-bh,bw*0.9,bh);
+ }
+ // 中線（往後延伸）
+ g.strokeStyle=G.night?'rgba(200,170,80,.5)':'rgba(224,178,63,.85)';
+ var dash=(G.carZ*2.2)%1;
+ for(var k=0;k<5;k++){
+  var f0=(k+dash)/5, f1=(k+0.5+dash)/5;
+  if(f1>1)continue;
+  var y0=hz+(my+mh-hz)*f0*f0, y1=hz+(my+mh-hz)*f1*f1;
+  g.lineWidth=Math.max(0.8,3*f1*f1);
+  g.beginPath();g.moveTo(mx+mw*0.5,y0);g.lineTo(mx+mw*0.5,y1);g.stroke();
+ }
+ // 後車
+ var gap=Math.max(2.5,G.carZ-T.z);
+ var mf=mw*1.15;
+ var cw=1.85*mf/gap;
+ if(cw<mw*2.6){
+  var kind=T.kind;
+  var tall=kind.bus?1.55:(kind.tall?1.15:(kind.truck?1.10:(kind.low?0.82:1)));
+  cw=Math.min(cw,mw*1.02);
+  var ch=Math.min(cw*0.66*tall,mh*0.86);
+  var cx=mx+mw*0.5+(0.10*mf/gap), cy=Math.min(my+mh*0.95,hz+(my+mh-hz)*0.72+ch*0.15);
+  var by=cy-ch;
+  // 陰影
+  g.fillStyle='rgba(0,0,0,.28)';
+  g.beginPath();g.ellipse(cx,cy+ch*0.04,cw*0.56,ch*0.09,0,0,6.3);g.fill();
+  // 車體
+  g.fillStyle=T.honk>0?shade(kind.body,0.22):kind.body;
+  rr(cx-cw*0.5,by,cw,ch,cw*0.07);g.fill();
+  g.fillStyle=shade(kind.body,-0.16);
+  g.fillRect(cx-cw*0.5,cy-ch*0.20,cw,ch*0.20);
+  // 擋風玻璃
+  g.fillStyle=kind.glass;
+  rr(cx-cw*0.40,by+ch*0.10,cw*0.80,ch*0.34,cw*0.04);g.fill();
+  // 駕駛剪影（生氣時揮手）
+  if(cw>mw*0.30){
+   var dxp=cx+cw*0.20, hy=by+ch*0.26, hr=cw*0.058;
+   g.fillStyle='rgba(16,18,26,.80)';
+   g.fillRect(dxp-hr*1.5,hy+hr*0.6,hr*3,ch*0.16);
+   g.fillStyle=G.night?'rgba(150,132,116,.85)':'rgba(196,160,130,.92)';
+   g.beginPath();g.arc(dxp,hy,hr,0,6.3);g.fill();
+   g.fillStyle='rgba(20,16,14,.85)';
+   g.beginPath();g.arc(dxp,hy-hr*0.22,hr*1.02,3.34,6.08);g.fill();
+   if(T.honk>0||T.mad>1){
+    var aw=Math.sin(G.t*16)*cw*0.08;
+    g.strokeStyle='rgba(196,160,130,.9)';g.lineWidth=Math.max(1,cw*0.042);
+    g.lineCap='round';
+    g.beginPath();g.moveTo(dxp-hr*1.2,hy+ch*0.10);
+    g.lineTo(dxp-cw*0.14+aw,hy-ch*0.06);g.stroke();
+   }
+  }
+  // 大燈
+  var lit=(T.flash>0&&Math.sin(G.t*22)>0)||G.night;
+  g.fillStyle=lit?'#fff6cf':'#c9c6bb';
+  rr(cx-cw*0.46,cy-ch*0.24,cw*0.16,ch*0.11,cw*0.02);g.fill();
+  rr(cx+cw*0.30,cy-ch*0.24,cw*0.16,ch*0.11,cw*0.02);g.fill();
+  if(lit){
+   g.globalCompositeOperation='lighter';
+   g.fillStyle='rgba(255,236,178,.10)';
+   g.beginPath();g.arc(cx-cw*0.38,cy-ch*0.19,cw*0.15,0,6.3);g.fill();
+   g.beginPath();g.arc(cx+cw*0.38,cy-ch*0.19,cw*0.15,0,6.3);g.fill();
+   g.globalCompositeOperation='source-over';
+  }
+  // 水箱罩 / 車牌
+  g.fillStyle=shade(kind.body,-0.42);
+  g.fillRect(cx-cw*0.20,cy-ch*0.26,cw*0.40,ch*0.09);
+  g.fillStyle='#e8e5dc';
+  g.fillRect(cx-cw*0.13,cy-ch*0.14,cw*0.26,ch*0.075);
+  // 計程車頂燈
+  if(kind.taxi&&cw>mw*0.22){
+   g.fillStyle='#f0d24a';
+   rr(cx-cw*0.14,by-ch*0.10,cw*0.28,ch*0.10,cw*0.02);g.fill();
+  }
+  if(kind.bus&&cw>mw*0.22){
+   g.fillStyle='#2c3a4a';
+   g.fillRect(cx-cw*0.34,by+ch*0.02,cw*0.68,ch*0.06);
+  }
+  // 太近時的紅光警示
+  if(gap<3.4){
+   g.globalAlpha=0.18+Math.sin(G.t*9)*0.10;
+   g.fillStyle='#e0574a';g.fillRect(mx,my,mw,mh);g.globalAlpha=1;
+  }
+ }
+ // 鏡面反光
+ g.globalCompositeOperation='lighter';
+ var gl=g.createLinearGradient(mx,my,mx+mw*0.5,my+mh);
+ gl.addColorStop(0,'rgba(255,255,255,.06)');gl.addColorStop(0.5,'rgba(255,255,255,0)');
+ g.fillStyle=gl;g.fillRect(mx,my,mw,mh);
+ g.globalCompositeOperation='source-over';
+}
+
+function drawHUDCanvas(){
+ var sig=G.crosses.find(function(c){return c.pedSignal&&c.z>G.carZ-2&&c.z-G.carZ<85;});
+ if(sig){var ps=pedLightState(sig,G.t);var msg='行人'+(ps.s==='g'?'綠燈':'紅燈')+' '+Math.ceil(ps.left)+' 秒'+(ps.flash?' · 即將結束':'');
+  g.save();g.font='bold '+Math.max(12,H*0.023)+'px sans-serif';var sw=g.measureText(msg).width+24;g.fillStyle='rgba(12,25,31,.92)';rr(W/2-sw/2,H*0.325,sw,30,6);g.fill();g.fillStyle=ps.s==='g'?'#73efaa':'#ff8f87';g.textAlign='center';g.fillText(msg,W/2,H*0.325+21);g.restore();}
+
+ // toasts
+ var y=H*0.16;
+ g.textAlign='center';
+ for(var i=0;i<G.toasts.length;i++){
+  var t=G.toasts[i];
+  g.globalAlpha=clamp(t.t/0.7,0,1);
+  g.font='700 '+Math.max(13,H*0.028).toFixed(0)+'px "Noto Sans TC",sans-serif';
+  var tw=g.measureText(t.txt).width;
+  g.fillStyle='rgba(12,15,21,.72)';rr(W*0.5-tw/2-12,y-H*0.026,tw+24,H*0.042,H*0.021);g.fill();
+  g.fillStyle=t.col;g.textBaseline='middle';
+  g.fillText(t.txt,W*0.5,y-H*0.005);
+  y+=H*0.052;
+ }
+ g.globalAlpha=1;g.textAlign='left';g.textBaseline='alphabetic';
+}
+
+/* ============ 8. 迴圈 ============ */
+var last=0;
+function loop(ts){
+ var dt=Math.min((ts-last)/1000||0,0.05); last=ts;
+ if(scene==='play')update(dt);
+ draw();
+ requestAnimationFrame(loop);
+}
+
+/* ============ 9. UI ============ */
+var el={};
+function $(id){return document.getElementById(id);}
+function show(id){
+ ['title','levels','howto','result'].forEach(function(s){$('sc-'+s).classList.toggle('on',s===id);});
+ $('screens').classList.toggle('on',!!id);
+ $('pad').style.display=(id===null)?'flex':'none';
+ $('hud').style.display=(id===null)?'flex':'none';
+}
+function stars(n){var s='';for(var i=0;i<3;i++)s+=(i<n?'★':'☆');return s;}
+
+function buildLevelList(){
+ var wrap=$('lvGrid');wrap.innerHTML='';
+ LEVELS.forEach(function(L,i){
+  var locked=i+1>save.unlocked;
+  var b=document.createElement('button');
+  b.className='lv'+(locked?' locked':'');
+  b.innerHTML='<span class="lvn">'+(i+1)+'</span>'+
+   '<span class="lvt">'+(locked?'？？？':L.name)+'</span>'+
+   (locked?'':'<span class="lvn">'+L.cross.length+' 處斑馬線 · '+L.castCount+' 位角色</span>')+
+   '<span class="lvs">'+(locked?'尚未解鎖':stars(save.stars[i]||0))+'</span>';
+  if(!locked)b.onclick=function(){show(null);startLevel(i);};
+  wrap.appendChild(b);
+ });
+}
+function showResult(){
+ if(typeof document==='undefined')return;
+ var r=G.result;
+ $('rsTitle').textContent=r.title;
+ $('rsDesc').textContent=r.desc;
+ $('rsStars').textContent=r.ok?stars(r.stars):'';
+ $('rsStars').style.display=r.ok?'block':'none';
+ $('rsScore').textContent=r.ok?('得分 '+r.score):'';
+ $('rsHead').textContent=r.ok?'過關':'失敗';
+ $('rsHead').className=r.ok?'rs-head ok':'rs-head bad';
+ $('btnNext').style.display=(r.ok&&G.idx+1<LEVELS.length)?'block':'none';
+ show('result');
+ scene='result';
+}
+
+function bindHold(elm,onDown,onUp){
+ var down=function(e){e.preventDefault();onDown();};
+ var up=function(e){onUp();};
+ elm.addEventListener('pointerdown',down);
+ elm.addEventListener('pointerup',up);
+ elm.addEventListener('pointercancel',up);
+ elm.addEventListener('pointerleave',up);
+ elm.addEventListener('contextmenu',function(e){e.preventDefault();});
+}
+
+function init(){
+ cv=$('cv'); g=cv.getContext('2d');
+ resize();
+ window.addEventListener('resize',resize);
+ window.addEventListener('orientationchange',function(){setTimeout(resize,220);});
+
+ bindHold($('bGas'),function(){if(G&&!G.over){G.gas=true;initAudio();if(AC&&AC.state==='suspended')AC.resume();}},function(){if(G)G.gas=false;});
+ bindHold($('bBrake'),function(){if(G&&!G.over)G.brake=true;},function(){if(G)G.brake=false;});
+ bindHold($('bLeft'),function(){if(G&&!G.over)G.steerInput=-1;},function(){if(G&&G.steerInput<0)G.steerInput=0;});
+ bindHold($('bRight'),function(){if(G&&!G.over)G.steerInput=1;},function(){if(G&&G.steerInput>0)G.steerInput=0;});
+ $('bHorn').addEventListener('pointerdown',function(e){e.preventDefault();honk();});
+
+ document.addEventListener('keydown',function(e){
+  if(scene!=='play'||!G||G.over)return;
+  if(e.key==='ArrowUp'||e.key==='w'||e.key==='W'){G.gas=true;e.preventDefault();initAudio();}
+  if(e.key==='ArrowDown'||e.key==='s'||e.key==='S'||e.key===' '){G.brake=true;e.preventDefault();}
+  if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A'){G.steerInput=-1;e.preventDefault();}
+  if(e.key==='ArrowRight'||e.key==='d'||e.key==='D'){G.steerInput=1;e.preventDefault();}
+  if(e.key==='h'||e.key==='H')honk();
+ });
+ document.addEventListener('keyup',function(e){
+  if(!G)return;
+  if(e.key==='ArrowUp'||e.key==='w'||e.key==='W')G.gas=false;
+  if(e.key==='ArrowDown'||e.key==='s'||e.key==='S'||e.key===' ')G.brake=false;
+  if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A'){if(G.steerInput<0)G.steerInput=0;}
+  if(e.key==='ArrowRight'||e.key==='d'||e.key==='D'){if(G.steerInput>0)G.steerInput=0;}
+ });
+
+ $('btnStart').onclick=function(){buildLevelList();show('levels');};
+ $('btnHow').onclick=function(){show('howto');};
+ $('btnHowBack').onclick=function(){show('title');};
+ $('btnLvBack').onclick=function(){show('title');};
+ $('btnRetry').onclick=function(){show(null);startLevel(G.idx);};
+ $('btnNext').onclick=function(){show(null);startLevel(G.idx+1);};
+ $('btnMenu').onclick=function(){buildLevelList();show('levels');};
+ $('btnQuit').onclick=function(){if(G)G.gas=G.brake=false;engine(0,false);buildLevelList();show('levels');scene='menu';};
+ $('btnSound').onclick=function(){audioOn=!audioOn;$('btnSound').textContent=audioOn?'♪':'✕';if(!audioOn)engine(0,false);};
+
+ show('title');
+ requestAnimationFrame(loop);
+
+ setInterval(function(){
+  if(scene!=='play'||!G)return;
+  $('hTime').textContent=Math.max(0,Math.ceil(G.left))+'s';
+  $('hTime').style.color=G.left<10?'#ff7a6b':'#f2ede4';
+  $('hName').textContent=(G.idx+1)+'. '+G.L.name;
+  $('hDist').textContent=Math.max(0,Math.round(G.L.goal-G.carZ))+' m';
+ },100);
+}
+if(typeof document!=='undefined'){
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);
+ else init();
+ setTimeout(function(){ if(!cv&&document.getElementById('cv'))init(); },600);
+}
+
+})();
+
+</script>
+</body>
+</html>
